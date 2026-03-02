@@ -52,6 +52,17 @@ describe('Router', () => {
     expect(decision?.reason).toContain('provider override');
   });
 
+  it('returns null when provider override is explicitly excluded', () => {
+    const router = new Router(createRules());
+
+    const decision = router.decide({
+      providerOverride: 'paystack',
+      exclude: ['paystack'],
+    });
+
+    expect(decision).toBeNull();
+  });
+
   it('supports exclusions and falls back to default rule', () => {
     const router = new Router(createRules());
 
@@ -101,6 +112,73 @@ describe('Router', () => {
     expect(lowDecision?.provider).toBe('dlocal');
     expect(highDecision?.provider).toBe('stripe');
     expect(highDecision?.reason).toContain('weighted selection');
+  });
+
+  it('falls back to the last weighted candidate when random returns 1', () => {
+    const rules: RoutingRule[] = [
+      {
+        provider: 'dlocal',
+        weight: 20,
+        match: {
+          country: 'BR',
+        },
+      },
+      {
+        provider: 'stripe',
+        weight: 80,
+        match: {
+          country: 'BR',
+        },
+      },
+      {
+        provider: 'stripe',
+        match: {
+          default: true,
+        },
+      },
+    ];
+
+    const router = new Router(rules, {
+      random: () => 1,
+    });
+
+    const decision = router.decide({ country: 'BR' });
+
+    expect(decision?.provider).toBe('stripe');
+    expect(decision?.reason).toContain('weighted selection');
+  });
+
+  it('uses generic reason text when a non-default rule has no criteria', () => {
+    const rules: RoutingRule[] = [
+      {
+        provider: 'stripe',
+        match: {},
+      },
+      {
+        provider: 'stripe',
+        match: {
+          default: true,
+        },
+      },
+    ];
+    const router = new Router(rules);
+
+    const decision = router.decide({});
+
+    expect(decision?.provider).toBe('stripe');
+    expect(decision?.reason).toBe('rule matched at index 0');
+  });
+
+  it('returns null when every matching provider is excluded', () => {
+    const router = new Router(createRules());
+
+    const decision = router.decide({
+      country: 'BR',
+      currency: 'USD',
+      exclude: ['dlocal', 'stripe'],
+    });
+
+    expect(decision).toBeNull();
   });
 
   it('throws when no default rule exists', () => {

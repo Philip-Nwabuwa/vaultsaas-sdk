@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VaultClient } from '../../src/client';
-import { VaultNetworkError } from '../../src/errors';
+import { VaultNetworkError, VaultRoutingError } from '../../src/errors';
 import type {
   CaptureRequest,
   ChargeRequest,
@@ -156,6 +156,55 @@ class TimeoutAdapter extends TestAdapter {
     const error = new Error('socket timeout') as Error & { code: string };
     error.code = 'ETIMEDOUT';
     throw error;
+  }
+}
+
+class VaultErrorAdapter extends TestAdapter {
+  async charge(_request: ChargeRequest): Promise<PaymentResult> {
+    throw new VaultRoutingError('Pre-normalized routing error', {
+      code: 'ROUTING_PROVIDER_UNAVAILABLE',
+    });
+  }
+}
+
+class WebhooklessAdapter implements PaymentAdapter {
+  readonly name: string;
+  private readonly delegate: TestAdapter;
+
+  constructor(config: Record<string, unknown>) {
+    this.delegate = new TestAdapter(config);
+    this.name = this.delegate.name;
+  }
+
+  async charge(request: ChargeRequest): Promise<PaymentResult> {
+    return this.delegate.charge(request);
+  }
+
+  async authorize(request: ChargeRequest): Promise<PaymentResult> {
+    return this.delegate.authorize(request);
+  }
+
+  async capture(request: CaptureRequest): Promise<PaymentResult> {
+    return this.delegate.capture(request);
+  }
+
+  async refund(request: RefundRequest): Promise<RefundResult> {
+    return this.delegate.refund(request);
+  }
+
+  async void(request: VoidRequest): Promise<VoidResult> {
+    return this.delegate.void(request);
+  }
+
+  async getStatus(transactionId: string): Promise<TransactionStatus> {
+    return this.delegate.getStatus(transactionId);
+  }
+
+  async listPaymentMethods(
+    country: string,
+    currency: string,
+  ): Promise<PaymentMethodInfo[]> {
+    return this.delegate.listPaymentMethods(country, currency);
   }
 }
 
@@ -369,5 +418,192 @@ describe('VaultClient', () => {
     expect(result.provider).toBe('stripe');
     expect(result.routing.source).toBe('local');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to local routing when platform returns no provider', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ reason: 'insufficient data' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+    const client = new VaultClient({
+      providers: {
+        stripe: {
+          adapter: TestAdapter,
+          config: { providerName: 'stripe' },
+        },
+      },
+      platformApiKey: 'pk_test_123',
+      platform: {
+        baseUrl: 'https://platform.test',
+      },
+    });
+
+    const result = await client.charge({
+      amount: 1200,
+      currency: 'USD',
+      paymentMethod: {
+        type: 'card',
+        number: '4242',
+        expMonth: 12,
+        expYear: 2030,
+        cvc: '123',
+      },
+    });
+
+    expect(result.provider).toBe('stripe');
+    expect(result.routing.source).toBe('local');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to local routing when platform provider is excluded by request', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          provider: 'stripe',
+          reason: 'platform selected stripe',
+          decisionId: 'dec_excluded',
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      ),
+    );
+
+    const client = new VaultClient({
+      providers: {
+        stripe: {
+          adapter: TestAdapter,
+          config: { providerName: 'stripe' },
+        },
+        dlocal: {
+          adapter: TestAdapter,
+          config: { providerName: 'dlocal' },
+        },
+      },
+      routing: {
+        rules: [{ match: { default: true }, provider: 'dlocal' }],
+      },
+      platformApiKey: 'pk_test_123',
+      platform: {
+        baseUrl: 'https://platform.test',
+      },
+    });
+
+    const result = await client.charge({
+      amount: 1200,
+      currency: 'USD',
+      paymentMethod: { type: 'card', token: 'tok_test' },
+      routing: {
+        exclude: ['stripe'],
+      },
+    });
+
+    expect(result.provider).toBe('dlocal');
+    expect(result.routing.source).toBe('local');
+  });
+
+  it('throws when forced provider is also excluded', async () => {
+    const client = createClient();
+
+    await expect(
+      client.charge({
+        amount: 2000,
+        currency: 'USD',
+        paymentMethod: { type: 'card', token: 'tok_test' },
+        routing: {
+          provider: 'stripe',
+          exclude: ['stripe'],
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: 'ROUTING_PROVIDER_EXCLUDED',
+      category: 'routing_error',
+    });
+  });
+
+  it('throws when forced provider is not configured', async () => {
+    const client = createClient();
+
+    await expect(
+      client.charge({
+        amount: 2000,
+        currency: 'USD',
+        paymentMethod: { type: 'card', token: 'tok_test' },
+        routing: {
+          provider: 'paystack',
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: 'ROUTING_PROVIDER_UNAVAILABLE',
+      category: 'routing_error',
+    });
+  });
+
+  it('uses local fallback provider when no routing config is present', async () => {
+    const client = new VaultClient({
+      providers: {
+        stripe: {
+          adapter: TestAdapter,
+          config: { providerName: 'stripe' },
+          priority: 10,
+        },
+        dlocal: {
+          adapter: TestAdapter,
+          config: { providerName: 'dlocal' },
+          priority: 1,
+        },
+      },
+    });
+
+    const result = await client.charge({
+      amount: 1500,
+      currency: 'USD',
+      paymentMethod: { type: 'card', token: 'tok_test' },
+    });
+
+    expect(result.provider).toBe('dlocal');
+    expect(result.routing.reason).toBe('fallback provider');
+  });
+
+  it('normalizes webhook payload when adapter does not implement handleWebhook', async () => {
+    const client = new VaultClient({
+      providers: {
+        stripe: {
+          adapter: WebhooklessAdapter,
+          config: { providerName: 'stripe' },
+        },
+      },
+      routing: {
+        rules: [{ match: { default: true }, provider: 'stripe' }],
+      },
+    });
+
+    const event = await client.handleWebhook('stripe', 'not-json', {
+      'content-type': 'application/json',
+    });
+
+    expect(event.provider).toBe('stripe');
+    expect(event.type).toBe('payment.failed');
+    expect(event.data).toEqual({ payload: 'not-json' });
+  });
+
+  it('preserves VaultError instances thrown by adapters', async () => {
+    const client = createSingleProviderClient(VaultErrorAdapter);
+
+    await expect(
+      client.charge({
+        amount: 1200,
+        currency: 'USD',
+        paymentMethod: { type: 'card', token: 'tok_test' },
+      }),
+    ).rejects.toMatchObject({
+      message: 'Pre-normalized routing error',
+      code: 'ROUTING_PROVIDER_UNAVAILABLE',
+      category: 'routing_error',
+    });
   });
 });

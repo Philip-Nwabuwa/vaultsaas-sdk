@@ -125,6 +125,201 @@ function baseConfig(): VaultConfig {
 }
 
 describe('VaultClient config validation', () => {
+  it('throws when config root is not an object', () => {
+    expect(() => new VaultClient(null as unknown as VaultConfig)).toThrow(
+      VaultConfigError,
+    );
+    expect(() => new VaultClient(null as unknown as VaultConfig)).toThrow(
+      'VaultClient configuration must be an object.',
+    );
+  });
+
+  it('throws when providers is not a plain object', () => {
+    const config = baseConfig();
+    config.providers = [] as unknown as VaultConfig['providers'];
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'At least one provider must be configured.',
+    );
+  });
+
+  it('throws when providers is empty', () => {
+    const config = baseConfig();
+    config.providers = {};
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'At least one provider must be configured.',
+    );
+  });
+
+  it('throws when provider definition is not an object', () => {
+    const config = baseConfig();
+    config.providers.stripe =
+      null as unknown as VaultConfig['providers']['stripe'];
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Provider configuration must be an object.',
+    );
+  });
+
+  it('throws when provider adapter constructor is not a function', () => {
+    const config = baseConfig();
+    config.providers.stripe = {
+      adapter:
+        undefined as unknown as VaultConfig['providers']['stripe']['adapter'],
+      config: { providerName: 'stripe' },
+    };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Provider adapter constructor is missing.',
+    );
+  });
+
+  it('throws for non-integer provider priority', () => {
+    const config = baseConfig();
+    config.providers.stripe.priority = 1.5;
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Provider priority must be an integer.',
+    );
+  });
+
+  it('throws when routing rules array is empty', () => {
+    const config = baseConfig();
+    config.routing = { rules: [] };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Routing rules must include at least one rule when routing is configured.',
+    );
+  });
+
+  it('throws when a routing rule is not an object', () => {
+    const config = baseConfig();
+    config.routing = {
+      rules: [null as unknown as VaultConfig['routing']['rules'][number]],
+    };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Routing rule must be an object.',
+    );
+  });
+
+  it('throws when a routing rule has no provider', () => {
+    const config = baseConfig();
+    config.routing = {
+      rules: [
+        { match: { currency: 'USD' }, provider: '' },
+        { match: { default: true }, provider: 'stripe' },
+      ],
+    };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Routing rule provider must be a non-empty string.',
+    );
+  });
+
+  it('throws when a routing rule references an unknown provider', () => {
+    const config = baseConfig();
+    config.routing = {
+      rules: [
+        { match: { currency: 'USD' }, provider: 'paystack' },
+        { match: { default: true }, provider: 'stripe' },
+      ],
+    };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Routing rule provider must reference an enabled configured provider.',
+    );
+  });
+
+  it('throws when routing rule match is missing', () => {
+    const config = baseConfig();
+    config.routing = {
+      rules: [
+        {
+          match: undefined as unknown as NonNullable<
+            VaultConfig['routing']
+          >['rules'][number]['match'],
+          provider: 'stripe',
+        },
+      ],
+    };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Routing rule match configuration is required.',
+    );
+  });
+
+  it('throws when routing amountMin is negative', () => {
+    const config = baseConfig();
+    config.routing = {
+      rules: [
+        { match: { amountMin: -1 }, provider: 'stripe' },
+        { match: { default: true }, provider: 'stripe' },
+      ],
+    };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Routing rule amountMin must be a non-negative number.',
+    );
+  });
+
+  it('throws when routing amountMax is negative', () => {
+    const config = baseConfig();
+    config.routing = {
+      rules: [
+        { match: { amountMax: -1 }, provider: 'stripe' },
+        { match: { default: true }, provider: 'stripe' },
+      ],
+    };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Routing rule amountMax must be a non-negative number.',
+    );
+  });
+
+  it('throws when routing amountMin exceeds amountMax', () => {
+    const config = baseConfig();
+    config.routing = {
+      rules: [
+        { match: { amountMin: 200, amountMax: 100 }, provider: 'stripe' },
+        { match: { default: true }, provider: 'stripe' },
+      ],
+    };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Routing rule amountMin cannot exceed amountMax.',
+    );
+  });
+
+  it('throws when routing rule weight is not positive', () => {
+    const config = baseConfig();
+    config.routing = {
+      rules: [
+        { match: { currency: 'USD' }, provider: 'stripe', weight: 0 },
+        { match: { default: true }, provider: 'stripe' },
+      ],
+    };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Routing rule weight must be a positive number.',
+    );
+  });
+
   it('throws for missing default routing rule when routing is configured', () => {
     const config = baseConfig();
     config.routing = {
@@ -205,5 +400,131 @@ describe('VaultClient config validation', () => {
     expect(() => new VaultClient(config)).toThrow(
       'platform.baseUrl cannot be empty when provided.',
     );
+  });
+
+  it('throws for empty platformApiKey', () => {
+    const config = baseConfig();
+    config.platformApiKey = '  ';
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'platformApiKey cannot be empty when provided.',
+    );
+  });
+
+  it('throws for invalid platform batch settings', () => {
+    const batchSizeConfig = baseConfig();
+    batchSizeConfig.platform = { batchSize: 0 };
+    expect(() => new VaultClient(batchSizeConfig)).toThrow(
+      'platform.batchSize must be a positive integer.',
+    );
+
+    const flushConfig = baseConfig();
+    flushConfig.platform = { flushIntervalMs: 0 };
+    expect(() => new VaultClient(flushConfig)).toThrow(
+      'platform.flushIntervalMs must be a positive integer.',
+    );
+
+    const retriesConfig = baseConfig();
+    retriesConfig.platform = { maxRetries: 0 };
+    expect(() => new VaultClient(retriesConfig)).toThrow(
+      'platform.maxRetries must be a positive integer.',
+    );
+
+    const backoffConfig = baseConfig();
+    backoffConfig.platform = { initialBackoffMs: 0 };
+    expect(() => new VaultClient(backoffConfig)).toThrow(
+      'platform.initialBackoffMs must be a positive integer.',
+    );
+  });
+
+  it('throws when idempotency store is missing required methods', () => {
+    const config = baseConfig();
+    config.idempotency = {
+      store: {
+        get() {
+          return null;
+        },
+      } as unknown as NonNullable<VaultConfig['idempotency']>['store'],
+    };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Idempotency store is missing required methods.',
+    );
+  });
+
+  it('throws for invalid logging level', () => {
+    const config = baseConfig();
+    config.logging = {
+      level: 'trace' as VaultConfig['logging']['level'],
+    };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Invalid logging level configured.',
+    );
+  });
+
+  it('throws when logger implementation misses required methods', () => {
+    const config = baseConfig();
+    config.logging = {
+      logger: {
+        error() {},
+        warn() {},
+        info() {},
+      } as unknown as NonNullable<VaultConfig['logging']>['logger'],
+    };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Logger implementation is missing a method.',
+    );
+  });
+
+  it('accepts a fully valid advanced config shape', () => {
+    const config = baseConfig();
+    config.idempotency = {
+      ttlMs: 60_000,
+      store: {
+        get() {
+          return null;
+        },
+        set() {},
+        delete() {},
+        clearExpired() {},
+      },
+    };
+    config.platformApiKey = 'pk_live_123';
+    config.platform = {
+      baseUrl: 'https://platform.vaultsaas.dev',
+      timeoutMs: 1000,
+      batchSize: 10,
+      flushIntervalMs: 250,
+      maxRetries: 2,
+      initialBackoffMs: 50,
+    };
+    config.logging = {
+      level: 'info',
+      logger: {
+        error() {},
+        warn() {},
+        info() {},
+        debug() {},
+      },
+    };
+    config.timeout = 1_500;
+    config.routing = {
+      rules: [
+        {
+          match: { currency: 'USD', amountMin: 100, amountMax: 10_000 },
+          provider: 'stripe',
+          weight: 1,
+        },
+        { match: { default: true }, provider: 'stripe' },
+      ],
+    };
+
+    expect(() => new VaultClient(config)).not.toThrow();
   });
 });

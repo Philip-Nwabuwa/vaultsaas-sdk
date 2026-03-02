@@ -9,6 +9,20 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov'],
       reportsDirectory: './coverage',
+      include: [
+        'src/client/**/*.ts',
+        'src/errors/**/*.ts',
+        'src/idempotency/**/*.ts',
+        'src/router/**/*.ts',
+        'src/webhooks/**/*.ts',
+      ],
+      exclude: ['**/index.ts'],
+      thresholds: {
+        lines: 90,
+        functions: 90,
+        statements: 90,
+        branches: 90,
+      },
     },
   },
 });
