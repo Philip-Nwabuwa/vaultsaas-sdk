@@ -3,7 +3,7 @@ import type {
   CaptureRequest,
   ChargeRequest,
   PaymentAdapter,
-  PaymentMethodDescriptor,
+  PaymentMethodInfo,
   PaymentResult,
   RefundRequest,
   RefundResult,
@@ -22,7 +22,7 @@ type HandlerMap = {
   listPaymentMethods: (
     country: string,
     currency: string,
-  ) => Promise<PaymentMethodDescriptor[]>;
+  ) => Promise<PaymentMethodInfo[]>;
 };
 
 function unsupported(method: string): never {
@@ -74,7 +74,7 @@ export class MockAdapter implements PaymentAdapter {
   listPaymentMethods(
     country: string,
     currency: string,
-  ): Promise<PaymentMethodDescriptor[]> {
+  ): Promise<PaymentMethodInfo[]> {
     const handler = this.handlers.listPaymentMethods;
     return handler
       ? handler(country, currency)

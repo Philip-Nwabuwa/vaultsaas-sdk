@@ -1,15 +1,22 @@
 export type VaultEventType =
-  | 'payment.authorized'
-  | 'payment.captured'
+  | 'payment.completed'
   | 'payment.failed'
-  | 'refund.succeeded'
-  | 'refund.failed'
-  | 'webhook.unknown';
+  | 'payment.pending'
+  | 'payment.requires_action'
+  | 'payment.refunded'
+  | 'payment.partially_refunded'
+  | 'payment.disputed'
+  | 'payment.dispute_resolved'
+  | 'payout.completed'
+  | 'payout.failed';
 
 export interface VaultEvent {
   id: string;
   type: VaultEventType;
   provider: string;
-  data: unknown;
-  createdAt: string;
+  transactionId?: string;
+  providerEventId: string;
+  data: Record<string, unknown>;
+  rawPayload: unknown;
+  timestamp: string;
 }

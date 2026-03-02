@@ -1,8 +1,9 @@
+import type { VaultEvent } from './events';
 import type {
   AuthorizeRequest,
   CaptureRequest,
   ChargeRequest,
-  PaymentMethodDescriptor,
+  PaymentMethodInfo,
   PaymentResult,
   RefundRequest,
   RefundResult,
@@ -22,5 +23,9 @@ export interface PaymentAdapter {
   listPaymentMethods(
     country: string,
     currency: string,
-  ): Promise<PaymentMethodDescriptor[]>;
+  ): Promise<PaymentMethodInfo[]>;
+  handleWebhook?(
+    payload: Buffer | string,
+    headers: Record<string, string>,
+  ): Promise<VaultEvent> | VaultEvent;
 }

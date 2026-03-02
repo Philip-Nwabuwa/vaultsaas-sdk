@@ -5,9 +5,7 @@ export class Router {
   readonly rules: RoutingRule[];
 
   constructor(rules: RoutingRule[]) {
-    this.rules = [...rules].sort(
-      (a, b) => (a.priority ?? 0) - (b.priority ?? 0),
-    );
+    this.rules = [...rules];
   }
 
   decide(context: RoutingContext): RoutingDecision | null {
@@ -15,22 +13,28 @@ export class Router {
       return {
         provider: context.providerOverride,
         reason: 'provider override',
+        rule: {
+          provider: context.providerOverride,
+          match: {
+            default: true,
+          },
+        },
       };
     }
 
     for (const rule of this.rules) {
-      if (!ruleMatchesContext(rule, context)) {
+      if (context.exclude?.includes(rule.provider)) {
         continue;
       }
 
-      if (context.excludedProviders?.includes(rule.provider)) {
+      if (!ruleMatchesContext(rule, context)) {
         continue;
       }
 
       return {
         provider: rule.provider,
-        reason: rule.isDefault ? 'default rule' : 'matched rule',
-        ruleId: rule.id,
+        reason: rule.match.default ? 'default rule' : 'matched rule',
+        rule,
       };
     }
 

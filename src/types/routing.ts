@@ -1,37 +1,33 @@
-export interface AmountRange {
-  min?: number;
-  max?: number;
-}
+export type RoutingMatchValue = string | string[];
 
-export interface RoutingConditions {
-  country?: string;
-  currency?: string;
-  paymentMethod?: string;
-  amount?: AmountRange;
+export interface RoutingMatch {
+  currency?: RoutingMatchValue;
+  country?: RoutingMatchValue;
+  paymentMethod?: RoutingMatchValue;
+  amountMin?: number;
+  amountMax?: number;
   metadata?: Record<string, string>;
+  default?: boolean;
 }
 
 export interface RoutingRule {
-  id: string;
+  match: RoutingMatch;
   provider: string;
-  priority?: number;
   weight?: number;
-  isDefault?: boolean;
-  conditions?: RoutingConditions;
 }
 
 export interface RoutingContext {
-  country?: string;
   currency?: string;
+  country?: string;
   paymentMethod?: string;
   amount?: number;
   metadata?: Record<string, string>;
   providerOverride?: string;
-  excludedProviders?: string[];
+  exclude?: string[];
 }
 
 export interface RoutingDecision {
   provider: string;
   reason: string;
-  ruleId?: string;
+  rule: RoutingRule;
 }

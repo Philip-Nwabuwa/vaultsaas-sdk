@@ -1,28 +1,34 @@
+import type { IdempotencyStore } from '../idempotency';
+import type { PaymentAdapter } from './adapter';
 import type { RoutingRule } from './routing';
 
+export interface LoggerInterface {
+  error(message: string, context?: Record<string, unknown>): void;
+  warn(message: string, context?: Record<string, unknown>): void;
+  info(message: string, context?: Record<string, unknown>): void;
+  debug(message: string, context?: Record<string, unknown>): void;
+}
+
 export interface ProviderConfig {
-  name: string;
+  adapter: new (config: Record<string, unknown>) => PaymentAdapter;
+  config: Record<string, unknown>;
+  priority?: number;
   enabled?: boolean;
-  options?: Record<string, unknown>;
-}
-
-export interface IdempotencyConfig {
-  enabled?: boolean;
-  ttlMs?: number;
-}
-
-export interface LoggingConfig {
-  level?: 'debug' | 'info' | 'warn' | 'error';
-  redactKeys?: string[];
 }
 
 export interface VaultConfig {
-  providers: ProviderConfig[];
-  routingRules?: RoutingRule[];
-  defaultProvider?: string;
-  idempotency?: IdempotencyConfig;
-  logging?: LoggingConfig;
+  providers: Record<string, ProviderConfig>;
+  routing?: {
+    rules: RoutingRule[];
+  };
+  idempotency?: {
+    store?: IdempotencyStore;
+    ttlMs?: number;
+  };
   platformApiKey?: string;
-  platformBaseUrl?: string;
-  requestTimeoutMs?: number;
+  logging?: {
+    level?: 'silent' | 'error' | 'warn' | 'info' | 'debug';
+    logger?: LoggerInterface;
+  };
+  timeout?: number;
 }

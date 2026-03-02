@@ -1,10 +1,14 @@
 import type { VaultEventType } from '../types';
 
 export const DEFAULT_VAULT_EVENT_TYPES: readonly VaultEventType[] = [
-  'payment.authorized',
-  'payment.captured',
+  'payment.completed',
   'payment.failed',
-  'refund.succeeded',
-  'refund.failed',
-  'webhook.unknown',
+  'payment.pending',
+  'payment.requires_action',
+  'payment.refunded',
+  'payment.partially_refunded',
+  'payment.disputed',
+  'payment.dispute_resolved',
+  'payout.completed',
+  'payout.failed',
 ];

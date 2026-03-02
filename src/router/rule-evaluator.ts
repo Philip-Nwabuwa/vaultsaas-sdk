@@ -1,43 +1,57 @@
 import type { RoutingContext, RoutingRule } from '../types';
 
+function matchesValue(ruleValue: string | string[], input?: string): boolean {
+  if (input === undefined) {
+    return false;
+  }
+
+  return Array.isArray(ruleValue)
+    ? ruleValue.includes(input)
+    : ruleValue === input;
+}
+
 export function ruleMatchesContext(
   rule: RoutingRule,
   context: RoutingContext,
 ): boolean {
-  const conditions = rule.conditions;
-  if (!conditions) {
+  const { match } = rule;
+
+  if (match.default) {
     return true;
   }
 
-  if (conditions.country && context.country !== conditions.country) {
+  if (match.country && !matchesValue(match.country, context.country)) {
     return false;
   }
 
-  if (conditions.currency && context.currency !== conditions.currency) {
+  if (match.currency && !matchesValue(match.currency, context.currency)) {
     return false;
   }
 
   if (
-    conditions.paymentMethod &&
-    context.paymentMethod !== conditions.paymentMethod
+    match.paymentMethod &&
+    !matchesValue(match.paymentMethod, context.paymentMethod)
   ) {
     return false;
   }
 
-  if (conditions.amount && context.amount !== undefined) {
-    const { min, max } = conditions.amount;
-    if (min !== undefined && context.amount < min) {
-      return false;
-    }
-
-    if (max !== undefined && context.amount > max) {
-      return false;
-    }
+  if (
+    match.amountMin !== undefined &&
+    (context.amount ?? Number.NEGATIVE_INFINITY) < match.amountMin
+  ) {
+    return false;
   }
 
-  if (conditions.metadata && context.metadata) {
-    for (const [key, expected] of Object.entries(conditions.metadata)) {
-      if (context.metadata[key] !== expected) {
+  if (
+    match.amountMax !== undefined &&
+    (context.amount ?? Number.POSITIVE_INFINITY) > match.amountMax
+  ) {
+    return false;
+  }
+
+  if (match.metadata) {
+    for (const [key, expected] of Object.entries(match.metadata)) {
+      if (context.metadata?.[key] !== expected) {
         return false;
       }
     }
