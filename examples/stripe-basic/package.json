@@ -1,0 +1,11 @@
+{
+  "name": "@vaultsaas/example-stripe-basic",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@vaultsaas/core": "file:../../"
+  }
+}

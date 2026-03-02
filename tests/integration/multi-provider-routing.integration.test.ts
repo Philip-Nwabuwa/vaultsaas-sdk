@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VaultClient } from '../../src/client';
 import type {
+  AdapterMetadata,
   CaptureRequest,
   ChargeRequest,
   PaymentAdapter,
@@ -14,8 +15,19 @@ import type {
   VoidResult,
 } from '../../src/types';
 
+const INTEGRATION_METADATA: AdapterMetadata = {
+  supportedMethods: ['card', 'pix', 'bank_transfer', 'wallet'],
+  supportedCurrencies: ['USD', 'BRL', 'NGN'],
+  supportedCountries: ['US', 'BR', 'NG', 'GH', 'ZA', 'KE'],
+};
+
 class IntegrationAdapter implements PaymentAdapter {
+  static readonly supportedMethods = INTEGRATION_METADATA.supportedMethods;
+  static readonly supportedCurrencies =
+    INTEGRATION_METADATA.supportedCurrencies;
+  static readonly supportedCountries = INTEGRATION_METADATA.supportedCountries;
   readonly name: string;
+  readonly metadata = INTEGRATION_METADATA;
 
   constructor(private readonly config: Record<string, unknown>) {
     this.name = String(config.providerName);

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { VaultClient } from '../../src/client';
 import { VaultConfigError } from '../../src/errors';
 import type {
+  AdapterMetadata,
   CaptureRequest,
   ChargeRequest,
   PaymentAdapter,
@@ -16,8 +17,18 @@ import type {
   VoidResult,
 } from '../../src/types';
 
+const MINIMAL_METADATA: AdapterMetadata = {
+  supportedMethods: ['card', 'pix'],
+  supportedCurrencies: ['USD'],
+  supportedCountries: ['US'],
+};
+
 class MinimalAdapter implements PaymentAdapter {
+  static readonly supportedMethods = MINIMAL_METADATA.supportedMethods;
+  static readonly supportedCurrencies = MINIMAL_METADATA.supportedCurrencies;
+  static readonly supportedCountries = MINIMAL_METADATA.supportedCountries;
   readonly name: string;
+  readonly metadata = MINIMAL_METADATA;
 
   constructor(config: Record<string, unknown>) {
     this.name = String(config.providerName ?? 'minimal');
@@ -176,6 +187,23 @@ describe('VaultClient config validation', () => {
     expect(() => new VaultClient(config)).toThrow(VaultConfigError);
     expect(() => new VaultClient(config)).toThrow(
       'Provider adapter constructor is missing.',
+    );
+  });
+
+  it('throws when provider adapter is missing static supportedMethods metadata', () => {
+    class BrokenAdapter extends MinimalAdapter {}
+    Object.defineProperty(BrokenAdapter, 'supportedMethods', {
+      value: undefined,
+      configurable: true,
+    });
+
+    const config = baseConfig();
+    config.providers.stripe.adapter =
+      BrokenAdapter as unknown as VaultConfig['providers']['stripe']['adapter'];
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'Provider adapter must declare static supportedMethods.',
     );
   });
 

@@ -267,6 +267,85 @@ function extractStripeTransactionId(
 
 export class StripeAdapter implements PaymentAdapter {
   readonly name = 'stripe';
+  static readonly supportedMethods = [
+    'card',
+    'bank_transfer',
+    'wallet',
+  ] as const;
+  static readonly supportedCurrencies = [
+    'USD',
+    'EUR',
+    'GBP',
+    'CAD',
+    'AUD',
+    'JPY',
+    'CHF',
+    'SEK',
+    'NOK',
+    'DKK',
+    'NZD',
+    'SGD',
+    'HKD',
+    'MXN',
+    'BRL',
+    'PLN',
+    'CZK',
+    'HUF',
+    'RON',
+    'BGN',
+    'INR',
+    'MYR',
+    'THB',
+  ] as const;
+  static readonly supportedCountries = [
+    'US',
+    'GB',
+    'DE',
+    'FR',
+    'CA',
+    'AU',
+    'JP',
+    'IT',
+    'ES',
+    'NL',
+    'BE',
+    'AT',
+    'CH',
+    'SE',
+    'NO',
+    'DK',
+    'FI',
+    'IE',
+    'PT',
+    'LU',
+    'NZ',
+    'SG',
+    'HK',
+    'MY',
+    'MX',
+    'BR',
+    'PL',
+    'CZ',
+    'HU',
+    'RO',
+    'BG',
+    'HR',
+    'CY',
+    'EE',
+    'GR',
+    'LV',
+    'LT',
+    'MT',
+    'SK',
+    'SI',
+    'IN',
+    'TH',
+  ] as const;
+  readonly metadata = {
+    supportedMethods: StripeAdapter.supportedMethods,
+    supportedCurrencies: StripeAdapter.supportedCurrencies,
+    supportedCountries: StripeAdapter.supportedCountries,
+  };
   private readonly config: Required<
     Pick<StripeAdapterConfig, 'apiKey' | 'baseUrl' | 'timeoutMs' | 'fetchFn'>
   > &
@@ -513,6 +592,32 @@ export class StripeAdapter implements PaymentAdapter {
         {
           context: {
             provider: this.name,
+          },
+        },
+      );
+    }
+
+    const timestampNum = Number(timestamp);
+    if (!Number.isFinite(timestampNum)) {
+      throw new WebhookVerificationError(
+        'Stripe webhook timestamp is not a valid number.',
+        {
+          context: {
+            provider: this.name,
+          },
+        },
+      );
+    }
+
+    const ageMs = Date.now() - timestampNum * 1000;
+    const toleranceMs = 5 * 60 * 1000; // 5 minutes
+    if (ageMs > toleranceMs) {
+      throw new WebhookVerificationError(
+        'Stripe webhook timestamp is too old (exceeds 5-minute tolerance). Possible replay attack.',
+        {
+          context: {
+            provider: this.name,
+            timestampAge: `${Math.round(ageMs / 1000)}s`,
           },
         },
       );

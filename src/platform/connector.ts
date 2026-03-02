@@ -2,6 +2,7 @@ import { VaultNetworkError } from '../errors';
 import type { LoggerInterface } from '../types';
 import { BatchBuffer } from './buffer';
 
+/** Platform telemetry and routing client configuration. */
 export interface PlatformConnectorConfig {
   apiKey: string;
   baseUrl?: string;
@@ -32,6 +33,7 @@ export interface PlatformRoutingRequest {
   metadata?: Record<string, string>;
 }
 
+/** Response shape for remote routing decisions. */
 export interface PlatformRoutingDecision {
   provider: string | null;
   source?: string;
@@ -41,6 +43,7 @@ export interface PlatformRoutingDecision {
   cascade?: string[];
 }
 
+/** Transaction telemetry event sent to the VaultSaaS platform. */
 export interface PlatformTransactionReport {
   id: string;
   provider: string;
@@ -60,6 +63,7 @@ export interface PlatformTransactionReport {
   timestamp: string;
 }
 
+/** Webhook forwarding payload sent to the VaultSaaS platform. */
 export interface PlatformWebhookForwardEvent {
   id: string;
   type: string;
@@ -70,6 +74,7 @@ export interface PlatformWebhookForwardEvent {
   timestamp: string;
 }
 
+/** Batches platform routing/telemetry requests with retry and timeout controls. */
 export class PlatformConnector {
   private static readonly DEFAULT_BASE_URL = 'https://api.vaultsaas.com';
   private static readonly DEFAULT_TIMEOUT_MS = 75;

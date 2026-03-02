@@ -7,6 +7,7 @@ import {
   type IdempotencyStore,
 } from '../../src/idempotency';
 import type {
+  AdapterMetadata,
   AuthorizeRequest,
   CaptureRequest,
   ChargeRequest,
@@ -22,8 +23,18 @@ import type {
   VoidResult,
 } from '../../src/types';
 
+const COUNTING_METADATA: AdapterMetadata = {
+  supportedMethods: ['card', 'pix'],
+  supportedCurrencies: ['USD'],
+  supportedCountries: ['US'],
+};
+
 class CountingAdapter implements PaymentAdapter {
+  static readonly supportedMethods = COUNTING_METADATA.supportedMethods;
+  static readonly supportedCurrencies = COUNTING_METADATA.supportedCurrencies;
+  static readonly supportedCountries = COUNTING_METADATA.supportedCountries;
   readonly name: string;
+  readonly metadata = COUNTING_METADATA;
   private readonly counter: { chargeCalls: number };
 
   constructor(config: Record<string, unknown>) {

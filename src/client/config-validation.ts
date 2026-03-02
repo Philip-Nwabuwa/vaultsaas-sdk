@@ -1,6 +1,7 @@
 import { VaultConfigError } from '../errors';
 import type {
   LoggerInterface,
+  PaymentAdapterConstructor,
   ProviderConfig,
   RoutingRule,
   VaultConfig,
@@ -33,6 +34,35 @@ function validateProviderConfig(name: string, provider: ProviderConfig): void {
     throw new VaultConfigError('Provider adapter constructor is missing.', {
       provider: name,
     });
+  }
+
+  const adapter =
+    provider.adapter as unknown as Partial<PaymentAdapterConstructor>;
+  if (!Array.isArray(adapter.supportedMethods)) {
+    throw new VaultConfigError(
+      'Provider adapter must declare static supportedMethods.',
+      {
+        provider: name,
+      },
+    );
+  }
+
+  if (!Array.isArray(adapter.supportedCurrencies)) {
+    throw new VaultConfigError(
+      'Provider adapter must declare static supportedCurrencies.',
+      {
+        provider: name,
+      },
+    );
+  }
+
+  if (!Array.isArray(adapter.supportedCountries)) {
+    throw new VaultConfigError(
+      'Provider adapter must declare static supportedCountries.',
+      {
+        provider: name,
+      },
+    );
   }
 
   if (!isPlainObject(provider.config)) {

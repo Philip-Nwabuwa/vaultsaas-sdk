@@ -1,7 +1,8 @@
 import type { IdempotencyStore } from '../idempotency';
-import type { PaymentAdapter } from './adapter';
+import type { PaymentAdapterConstructor } from './adapter';
 import type { RoutingRule } from './routing';
 
+/** Logger contract used by `VaultClient` and `PlatformConnector`. */
 export interface LoggerInterface {
   error(message: string, context?: Record<string, unknown>): void;
   warn(message: string, context?: Record<string, unknown>): void;
@@ -9,13 +10,15 @@ export interface LoggerInterface {
   debug(message: string, context?: Record<string, unknown>): void;
 }
 
+/** Config for a single provider adapter instance. */
 export interface ProviderConfig {
-  adapter: new (config: Record<string, unknown>) => PaymentAdapter;
+  adapter: PaymentAdapterConstructor;
   config: Record<string, unknown>;
   priority?: number;
   enabled?: boolean;
 }
 
+/** Root configuration object accepted by `new VaultClient(config)`. */
 export interface VaultConfig {
   providers: Record<string, ProviderConfig>;
   routing?: {

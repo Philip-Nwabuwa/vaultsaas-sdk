@@ -1,5 +1,10 @@
 import { VaultRoutingError } from '../errors';
-import type { RoutingContext, RoutingDecision, RoutingRule } from '../types';
+import type {
+  AdapterMetadata,
+  RoutingContext,
+  RoutingDecision,
+  RoutingRule,
+} from '../types';
 import { ruleMatchesContext } from './rule-evaluator';
 
 interface WeightedCandidate {
@@ -7,17 +12,27 @@ interface WeightedCandidate {
   rule: RoutingRule;
 }
 
+/** Optional controls for routing behavior and capability validation. */
 export interface RouterOptions {
   random?: () => number;
+  adapterMetadata?: Record<string, AdapterMetadata>;
+  logger?: {
+    warn(message: string, context?: Record<string, unknown>): void;
+  };
 }
 
+/** Deterministic routing engine for selecting a provider from ordered rules. */
 export class Router {
   readonly rules: RoutingRule[];
   private readonly random: () => number;
+  private readonly adapterMetadata: Record<string, AdapterMetadata>;
+  private readonly logger?: RouterOptions['logger'];
 
   constructor(rules: RoutingRule[], options: RouterOptions = {}) {
     this.rules = [...rules];
     this.random = options.random ?? Math.random;
+    this.adapterMetadata = options.adapterMetadata ?? {};
+    this.logger = options.logger;
 
     if (!this.rules.some((rule) => rule.match.default)) {
       throw new VaultRoutingError(
@@ -29,6 +44,10 @@ export class Router {
   decide(context: RoutingContext): RoutingDecision | null {
     if (context.providerOverride) {
       if (context.exclude?.includes(context.providerOverride)) {
+        return null;
+      }
+
+      if (!this.providerSupportsContext(context.providerOverride, context)) {
         return null;
       }
 
@@ -58,6 +77,10 @@ export class Router {
         continue;
       }
 
+      if (!this.providerSupportsContext(rule.provider, context)) {
+        continue;
+      }
+
       if (rule.weight !== undefined) {
         const weightedCandidates = this.getWeightedCandidates(index, context);
         if (weightedCandidates.length > 0) {
@@ -83,6 +106,66 @@ export class Router {
     return null;
   }
 
+  private providerSupportsContext(
+    provider: string,
+    context: RoutingContext,
+  ): boolean {
+    const meta = this.adapterMetadata[provider];
+    if (!meta) {
+      return true;
+    }
+
+    if (
+      context.paymentMethod &&
+      meta.supportedMethods.length > 0 &&
+      !meta.supportedMethods.includes(context.paymentMethod)
+    ) {
+      this.logger?.warn(
+        `Provider "${provider}" does not support payment method "${context.paymentMethod}". Skipping.`,
+        {
+          provider,
+          paymentMethod: context.paymentMethod,
+          supportedMethods: [...meta.supportedMethods],
+        },
+      );
+      return false;
+    }
+
+    if (
+      context.currency &&
+      meta.supportedCurrencies.length > 0 &&
+      !meta.supportedCurrencies.includes(context.currency)
+    ) {
+      this.logger?.warn(
+        `Provider "${provider}" does not support currency "${context.currency}". Skipping.`,
+        {
+          provider,
+          currency: context.currency,
+          supportedCurrencies: [...meta.supportedCurrencies],
+        },
+      );
+      return false;
+    }
+
+    if (
+      context.country &&
+      meta.supportedCountries.length > 0 &&
+      !meta.supportedCountries.includes(context.country)
+    ) {
+      this.logger?.warn(
+        `Provider "${provider}" does not support country "${context.country}". Skipping.`,
+        {
+          provider,
+          country: context.country,
+          supportedCountries: [...meta.supportedCountries],
+        },
+      );
+      return false;
+    }
+
+    return true;
+  }
+
   private getWeightedCandidates(
     startIndex: number,
     context: RoutingContext,
@@ -104,6 +187,10 @@ export class Router {
       }
 
       if (context.exclude?.includes(rule.provider)) {
+        continue;
+      }
+
+      if (!this.providerSupportsContext(rule.provider, context)) {
         continue;
       }
 

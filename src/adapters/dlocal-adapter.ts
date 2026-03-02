@@ -235,6 +235,52 @@ function timestampOrNow(input?: string): string {
 
 export class DLocalAdapter implements PaymentAdapter {
   readonly name = 'dlocal';
+  static readonly supportedMethods = [
+    'card',
+    'pix',
+    'boleto',
+    'bank_transfer',
+  ] as const;
+  static readonly supportedCurrencies = [
+    'BRL',
+    'MXN',
+    'ARS',
+    'CLP',
+    'COP',
+    'PEN',
+    'UYU',
+    'BOB',
+    'PYG',
+    'CRC',
+    'GTQ',
+    'PAB',
+    'DOP',
+    'USD',
+  ] as const;
+  static readonly supportedCountries = [
+    'BR',
+    'MX',
+    'AR',
+    'CL',
+    'CO',
+    'PE',
+    'UY',
+    'BO',
+    'PY',
+    'CR',
+    'GT',
+    'PA',
+    'DO',
+    'EC',
+    'SV',
+    'NI',
+    'HN',
+  ] as const;
+  readonly metadata = {
+    supportedMethods: DLocalAdapter.supportedMethods,
+    supportedCurrencies: DLocalAdapter.supportedCurrencies,
+    supportedCountries: DLocalAdapter.supportedCountries,
+  };
   private readonly config: Required<
     Pick<
       DLocalAdapterConfig,

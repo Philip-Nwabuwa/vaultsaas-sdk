@@ -234,6 +234,24 @@ function timestampOrNow(input?: string): string {
 
 export class PaystackAdapter implements PaymentAdapter {
   readonly name = 'paystack';
+  static readonly supportedMethods = [
+    'card',
+    'bank_transfer',
+    'wallet',
+  ] as const;
+  static readonly supportedCurrencies = [
+    'NGN',
+    'GHS',
+    'ZAR',
+    'KES',
+    'USD',
+  ] as const;
+  static readonly supportedCountries = ['NG', 'GH', 'ZA', 'KE'] as const;
+  readonly metadata = {
+    supportedMethods: PaystackAdapter.supportedMethods,
+    supportedCurrencies: PaystackAdapter.supportedCurrencies,
+    supportedCountries: PaystackAdapter.supportedCountries,
+  };
   private readonly config: Required<
     Pick<
       PaystackAdapterConfig,
@@ -352,7 +370,6 @@ export class PaystackAdapter implements PaymentAdapter {
       body: {
         transaction: request.transactionId,
         amount: request.amount,
-        currency: request.amount ? undefined : undefined,
       },
     });
 

@@ -1,4 +1,5 @@
 import type {
+  AdapterMetadata,
   AuthorizeRequest,
   CaptureRequest,
   ChargeRequest,
@@ -65,6 +66,7 @@ export interface MockAdapterScenarios {
 
 export interface MockAdapterOptions {
   name?: string;
+  metadata?: AdapterMetadata;
   handlers?: MockAdapterHandlers;
   scenarios?: Partial<MockAdapterScenarios>;
 }
@@ -75,10 +77,21 @@ function unsupported(method: string): never {
   throw new Error(`MockAdapter handler not configured: ${method}`);
 }
 
+const DEFAULT_MOCK_METADATA: AdapterMetadata = {
+  supportedMethods: ['card', 'bank_transfer', 'wallet'],
+  supportedCurrencies: ['USD', 'EUR', 'GBP'],
+  supportedCountries: ['US', 'GB', 'DE'],
+};
+
 function hasMockAdapterOptions(
   value: MockAdapterOptions | MockAdapterHandlers,
 ): value is MockAdapterOptions {
-  return 'handlers' in value || 'scenarios' in value || 'name' in value;
+  return (
+    'handlers' in value ||
+    'scenarios' in value ||
+    'name' in value ||
+    'metadata' in value
+  );
 }
 
 function toScenarioQueue<Input, Output>(
@@ -103,7 +116,12 @@ function toScenarioQueue<Input, Output>(
 }
 
 export class MockAdapter implements PaymentAdapter {
+  static readonly supportedMethods = DEFAULT_MOCK_METADATA.supportedMethods;
+  static readonly supportedCurrencies =
+    DEFAULT_MOCK_METADATA.supportedCurrencies;
+  static readonly supportedCountries = DEFAULT_MOCK_METADATA.supportedCountries;
   readonly name: string;
+  readonly metadata: AdapterMetadata;
   private readonly handlers: MockAdapterHandlers;
   private readonly chargeScenarios: ScenarioQueue<ChargeRequest, PaymentResult>;
   private readonly authorizeScenarios: ScenarioQueue<
@@ -132,6 +150,7 @@ export class MockAdapter implements PaymentAdapter {
       : { handlers: options };
 
     this.name = normalized.name ?? 'mock';
+    this.metadata = normalized.metadata ?? DEFAULT_MOCK_METADATA;
     this.handlers = normalized.handlers ?? {};
     this.chargeScenarios = toScenarioQueue(normalized.scenarios?.charge);
     this.authorizeScenarios = toScenarioQueue(normalized.scenarios?.authorize);

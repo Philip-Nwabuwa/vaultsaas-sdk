@@ -1,5 +1,7 @@
 # @vaultsaas/core
 
+[![CI](https://img.shields.io/badge/CI-GitHub_Actions-2ea44f?logo=githubactions&logoColor=white)](./.github/workflows/ci.yml)
+
 Open-source TypeScript SDK for VaultSaaS payment orchestration.
 
 ## Install
@@ -109,6 +111,20 @@ STRIPE_API_KEY=sk_test_xxx bun quickstart.ts
 - [Error Handling](./docs/error-handling.md)
 - [Platform Connector](./docs/platform-connector.md)
 - [Versioning and Migration Policy](./docs/versioning-and-migrations.md)
+- [Troubleshooting FAQ](./docs/troubleshooting.md)
+- Provider guides:
+  - [Stripe](./docs/providers/stripe.md)
+  - [dLocal](./docs/providers/dlocal.md)
+  - [Paystack](./docs/providers/paystack.md)
+- [Architecture](./docs/architecture.md)
+- [Security Policy](./SECURITY.md)
+- [Security Review (v0.1.0)](./docs/security-review-v0.1.0.md)
+
+## Examples
+
+- [Stripe Basic](./examples/stripe-basic/README.md)
+- [dLocal Basic](./examples/dlocal-basic/README.md)
+- [Paystack Basic](./examples/paystack-basic/README.md)
 
 ## Scripts
 

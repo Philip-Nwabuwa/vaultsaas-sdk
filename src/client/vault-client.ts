@@ -14,6 +14,7 @@ import {
 import { PlatformConnector, type PlatformTransactionReport } from '../platform';
 import { Router } from '../router';
 import type {
+  AdapterMetadata,
   AuthorizeRequest,
   CaptureRequest,
   ChargeRequest,
@@ -46,6 +47,21 @@ interface IdempotentRequest {
   idempotencyKey?: string;
 }
 
+function normalizeAdapterMetadata(metadata: AdapterMetadata): AdapterMetadata {
+  return {
+    supportedMethods: metadata.supportedMethods.map((method) =>
+      method.toLowerCase(),
+    ),
+    supportedCurrencies: metadata.supportedCurrencies.map((currency) =>
+      currency.toUpperCase(),
+    ),
+    supportedCountries: metadata.supportedCountries.map((country) =>
+      country.toUpperCase(),
+    ),
+  };
+}
+
+/** Main orchestration client for charge, auth/capture, refund, void, and webhooks. */
 export class VaultClient {
   readonly config: VaultConfig;
   private readonly adapters = new Map<string, PaymentAdapter>();
@@ -61,6 +77,7 @@ export class VaultClient {
     this.config = config;
 
     const entries = Object.entries(config.providers);
+    const adapterMetadata: Record<string, AdapterMetadata> = {};
 
     this.providerOrder = entries
       .filter(([, provider]) => provider.enabled !== false)
@@ -78,7 +95,19 @@ export class VaultClient {
           );
         }
 
-        this.adapters.set(name, new provider.adapter(provider.config));
+        const adapter = new provider.adapter(provider.config);
+        this.adapters.set(name, adapter);
+        adapterMetadata[name] = normalizeAdapterMetadata({
+          supportedMethods:
+            provider.adapter.supportedMethods ??
+            adapter.metadata.supportedMethods,
+          supportedCurrencies:
+            provider.adapter.supportedCurrencies ??
+            adapter.metadata.supportedCurrencies,
+          supportedCountries:
+            provider.adapter.supportedCountries ??
+            adapter.metadata.supportedCountries,
+        });
         return name;
       });
 
@@ -87,7 +116,10 @@ export class VaultClient {
     }
 
     this.router = config.routing?.rules?.length
-      ? new Router(config.routing.rules)
+      ? new Router(config.routing.rules, {
+          adapterMetadata,
+          logger: config.logging?.logger,
+        })
       : null;
     this.platformConnector = config.platformApiKey
       ? new PlatformConnector({
@@ -370,7 +402,8 @@ export class VaultClient {
     }
 
     const context: RoutingContext = {
-      currency: request.currency,
+      currency: request.currency.toUpperCase(),
+      country: request.customer?.address?.country?.toUpperCase(),
       paymentMethod: request.paymentMethod.type,
       amount: request.amount,
       metadata: request.metadata,

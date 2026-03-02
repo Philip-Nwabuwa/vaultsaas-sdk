@@ -4,6 +4,7 @@ import {
   VaultProviderError,
 } from './vault-error';
 
+/** Optional provider-side fields used to improve error classification. */
 export interface ProviderErrorHint {
   providerCode?: string;
   providerMessage?: string;
@@ -16,6 +17,7 @@ export interface ProviderErrorHint {
   raw?: unknown;
 }
 
+/** Context attached to mapped provider errors. */
 export interface ProviderErrorMappingContext {
   provider: string;
   operation: string;
@@ -274,12 +276,12 @@ function classifyProviderError(
     return { code: 'AUTHENTICATION_REQUIRED' };
   }
 
-  if (matchAny(textBlob, CARD_DECLINED_PATTERNS)) {
-    return { code: 'CARD_DECLINED' };
-  }
-
   if (matchAny(textBlob, FRAUD_PATTERNS)) {
     return { code: 'FRAUD_SUSPECTED' };
+  }
+
+  if (matchAny(textBlob, CARD_DECLINED_PATTERNS)) {
+    return { code: 'CARD_DECLINED' };
   }
 
   if (
@@ -299,6 +301,7 @@ function classifyProviderError(
   return { code: 'PROVIDER_UNKNOWN' };
 }
 
+/** Normalizes unknown provider errors into Vault error classes with stable codes. */
 export function mapProviderError(
   error: unknown,
   mappingContext: ProviderErrorMappingContext,

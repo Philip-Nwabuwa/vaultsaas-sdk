@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { VaultRoutingError } from '../../src/errors';
 import { Router } from '../../src/router';
-import type { RoutingContext, RoutingRule } from '../../src/types';
+import type {
+  AdapterMetadata,
+  RoutingContext,
+  RoutingRule,
+} from '../../src/types';
 
 function createRules(): RoutingRule[] {
   return [
@@ -195,5 +199,97 @@ describe('Router', () => {
     expect(() => new Router(rules)).toThrow(
       'Routing rules must include a default fallback rule.',
     );
+  });
+
+  it('skips a matching provider when metadata does not support currency', () => {
+    const metadata: Record<string, AdapterMetadata> = {
+      dlocal: {
+        supportedMethods: ['card'],
+        supportedCurrencies: ['BRL'],
+        supportedCountries: ['BR'],
+      },
+      stripe: {
+        supportedMethods: ['card'],
+        supportedCurrencies: ['USD'],
+        supportedCountries: ['US', 'BR'],
+      },
+    };
+    const router = new Router(createRules(), { adapterMetadata: metadata });
+
+    const decision = router.decide({
+      country: 'BR',
+      currency: 'USD',
+      paymentMethod: 'card',
+    });
+
+    expect(decision?.provider).toBe('stripe');
+    expect(decision?.reason).toContain('index 1');
+  });
+
+  it('returns null for incompatible provider override metadata', () => {
+    const metadata: Record<string, AdapterMetadata> = {
+      paystack: {
+        supportedMethods: ['card'],
+        supportedCurrencies: ['NGN'],
+        supportedCountries: ['NG'],
+      },
+    };
+    const router = new Router(createRules(), { adapterMetadata: metadata });
+
+    const decision = router.decide({
+      providerOverride: 'paystack',
+      currency: 'USD',
+      paymentMethod: 'card',
+    });
+
+    expect(decision).toBeNull();
+  });
+
+  it('excludes unsupported providers from weighted candidate selection', () => {
+    const rules: RoutingRule[] = [
+      {
+        provider: 'dlocal',
+        weight: 20,
+        match: {
+          country: 'BR',
+        },
+      },
+      {
+        provider: 'stripe',
+        weight: 80,
+        match: {
+          country: 'BR',
+        },
+      },
+      {
+        provider: 'stripe',
+        match: {
+          default: true,
+        },
+      },
+    ];
+    const router = new Router(rules, {
+      random: () => 0.01,
+      adapterMetadata: {
+        dlocal: {
+          supportedMethods: ['pix'],
+          supportedCurrencies: ['BRL'],
+          supportedCountries: ['BR'],
+        },
+        stripe: {
+          supportedMethods: ['card'],
+          supportedCurrencies: ['USD', 'BRL'],
+          supportedCountries: ['BR', 'US'],
+        },
+      },
+    });
+
+    const decision = router.decide({
+      country: 'BR',
+      currency: 'BRL',
+      paymentMethod: 'card',
+    });
+
+    expect(decision?.provider).toBe('stripe');
   });
 });

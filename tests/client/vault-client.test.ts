@@ -2,9 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VaultClient } from '../../src/client';
 import { VaultNetworkError, VaultRoutingError } from '../../src/errors';
 import type {
+  AdapterMetadata,
   CaptureRequest,
   ChargeRequest,
   PaymentAdapter,
+  PaymentAdapterConstructor,
   PaymentMethodInfo,
   PaymentResult,
   RefundRequest,
@@ -15,8 +17,18 @@ import type {
   VoidResult,
 } from '../../src/types';
 
+const TEST_METADATA: AdapterMetadata = {
+  supportedMethods: ['card', 'pix', 'bank_transfer', 'wallet', 'boleto'],
+  supportedCurrencies: ['USD', 'BRL', 'NGN'],
+  supportedCountries: ['US', 'BR', 'NG'],
+};
+
 class TestAdapter implements PaymentAdapter {
+  static readonly supportedMethods = TEST_METADATA.supportedMethods;
+  static readonly supportedCurrencies = TEST_METADATA.supportedCurrencies;
+  static readonly supportedCountries = TEST_METADATA.supportedCountries;
   readonly name: string;
+  readonly metadata = TEST_METADATA;
 
   constructor(private readonly config: Record<string, unknown>) {
     this.name = String(config.providerName);
@@ -167,8 +179,25 @@ class VaultErrorAdapter extends TestAdapter {
   }
 }
 
+const USD_ONLY_METADATA: AdapterMetadata = {
+  supportedMethods: ['card'],
+  supportedCurrencies: ['USD'],
+  supportedCountries: ['US'],
+};
+
+class UsdOnlyAdapter extends TestAdapter {
+  static readonly supportedMethods = USD_ONLY_METADATA.supportedMethods;
+  static readonly supportedCurrencies = USD_ONLY_METADATA.supportedCurrencies;
+  static readonly supportedCountries = USD_ONLY_METADATA.supportedCountries;
+  readonly metadata = USD_ONLY_METADATA;
+}
+
 class WebhooklessAdapter implements PaymentAdapter {
+  static readonly supportedMethods = TestAdapter.supportedMethods;
+  static readonly supportedCurrencies = TestAdapter.supportedCurrencies;
+  static readonly supportedCountries = TestAdapter.supportedCountries;
   readonly name: string;
+  readonly metadata = TEST_METADATA;
   private readonly delegate: TestAdapter;
 
   constructor(config: Record<string, unknown>) {
@@ -230,7 +259,7 @@ function createClient(): VaultClient {
 }
 
 function createSingleProviderClient(
-  adapter: new (config: Record<string, unknown>) => PaymentAdapter,
+  adapter: PaymentAdapterConstructor,
 ): VaultClient {
   return new VaultClient({
     providers: {
@@ -268,6 +297,36 @@ describe('VaultClient', () => {
     });
 
     expect(captured.provider).toBe('dlocal');
+  });
+
+  it('skips rule-matched providers when adapter metadata does not support context', async () => {
+    const client = new VaultClient({
+      providers: {
+        stripe: {
+          adapter: TestAdapter,
+          config: { providerName: 'stripe' },
+        },
+        dlocal: {
+          adapter: UsdOnlyAdapter,
+          config: { providerName: 'dlocal' },
+        },
+      },
+      routing: {
+        rules: [
+          { match: { currency: 'BRL' }, provider: 'dlocal' },
+          { match: { default: true }, provider: 'stripe' },
+        ],
+      },
+    });
+
+    const charged = await client.charge({
+      amount: 5000,
+      currency: 'BRL',
+      paymentMethod: { type: 'pix' },
+    });
+
+    expect(charged.provider).toBe('stripe');
+    expect(charged.routing.reason).toContain('default fallback');
   });
 
   it('aggregates payment methods from enabled adapters', async () => {

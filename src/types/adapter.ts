@@ -12,8 +12,17 @@ import type {
   VoidResult,
 } from './payment';
 
+/** Static provider capability declaration used by routing validation. */
+export interface AdapterMetadata {
+  readonly supportedMethods: readonly string[];
+  readonly supportedCurrencies: readonly string[];
+  readonly supportedCountries: readonly string[];
+}
+
+/** Runtime adapter contract used by `VaultClient`. */
 export interface PaymentAdapter {
   readonly name: string;
+  readonly metadata: AdapterMetadata;
   charge(request: ChargeRequest): Promise<PaymentResult>;
   authorize(request: AuthorizeRequest): Promise<PaymentResult>;
   capture(request: CaptureRequest): Promise<PaymentResult>;
@@ -28,4 +37,12 @@ export interface PaymentAdapter {
     payload: Buffer | string,
     headers: Record<string, string>,
   ): Promise<VaultEvent> | VaultEvent;
+}
+
+/** Adapter class contract used in provider configuration. */
+export interface PaymentAdapterConstructor {
+  new (config: Record<string, unknown>): PaymentAdapter;
+  readonly supportedMethods: readonly string[];
+  readonly supportedCurrencies: readonly string[];
+  readonly supportedCountries: readonly string[];
 }
