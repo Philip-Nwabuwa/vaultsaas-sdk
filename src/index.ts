@@ -1,3 +1,4 @@
+export * from './adapters';
 export { VaultClient } from './client';
 export * from './errors';
 export * from './idempotency';
