@@ -56,10 +56,7 @@ const first = await vault.charge({
   currency: 'USD',
   paymentMethod: {
     type: 'card',
-    number: '4242424242424242',
-    expMonth: 12,
-    expYear: 2030,
-    cvc: '123',
+    token: 'pm_card_visa',
   },
   idempotencyKey: 'order-1001-charge-v1',
 });
@@ -69,10 +66,7 @@ const replay = await vault.charge({
   currency: 'USD',
   paymentMethod: {
     type: 'card',
-    number: '4242424242424242',
-    expMonth: 12,
-    expYear: 2030,
-    cvc: '123',
+    token: 'pm_card_visa',
   },
   idempotencyKey: 'order-1001-charge-v1',
 });
@@ -85,10 +79,7 @@ try {
     currency: 'USD',
     paymentMethod: {
       type: 'card',
-      number: '4242424242424242',
-      expMonth: 12,
-      expYear: 2030,
-      cvc: '123',
+      token: 'pm_card_visa',
     },
     idempotencyKey: 'order-1001-charge-v1',
   });

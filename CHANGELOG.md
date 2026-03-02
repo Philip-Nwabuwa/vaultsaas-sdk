@@ -7,6 +7,13 @@ and this project follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-03-02
+
+### Fixed
+
+- Updated Stripe quickstart and related docs to use Stripe test payment method tokens (`pm_card_visa`, `pm_card_chargeDeclined`) instead of raw card numbers that are blocked by default.
+- Added troubleshooting guidance for Stripe's "raw card data APIs" rejection error and recommended token-based test flows.
+
 ## [0.1.0] - 2026-03-02
 
 ### Added
@@ -40,4 +47,3 @@ and this project follows Semantic Versioning.
 
 - Added CI badge and expanded docs links in README.
 - Added troubleshooting and provider guide links from README.
-

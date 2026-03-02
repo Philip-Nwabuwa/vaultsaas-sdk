@@ -51,10 +51,7 @@ try {
     currency: 'USD',
     paymentMethod: {
       type: 'card',
-      number: '4000000000000002', // common Stripe decline test card
-      expMonth: 12,
-      expYear: 2030,
-      cvc: '123',
+      token: 'pm_card_chargeDeclined', // common Stripe decline test payment method
     },
     customer: {
       email: 'buyer@example.com',

@@ -54,10 +54,7 @@ try {
     currency: 'USD',
     paymentMethod: {
       type: 'card',
-      number: '4242424242424242',
-      expMonth: 12,
-      expYear: 2030,
-      cvc: '123',
+      token: 'pm_card_visa',
     },
     customer: {
       email: 'buyer@example.com',
@@ -104,6 +101,7 @@ STRIPE_API_KEY=sk_test_xxx bun quickstart.ts
 ```
 
 Note: if you include `customer.name` for Stripe shipping details, also include `customer.address` to avoid provider validation errors.
+For Stripe test mode, use test tokens/payment methods (for example `pm_card_visa`) instead of raw card numbers unless Stripe has explicitly enabled raw card data APIs on your account.
 
 ## Documentation
 

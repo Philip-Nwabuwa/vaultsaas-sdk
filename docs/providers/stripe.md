@@ -59,4 +59,5 @@ Stripe verification enforces:
 ## Test Mode Notes
 
 - Use `sk_test_...` keys for development.
-- Use Stripe test cards (for example `4242424242424242`) for non-3DS happy-path tests.
+- Prefer Stripe test payment method tokens such as `pm_card_visa` (success) and `pm_card_chargeDeclined` (decline simulation).
+- Raw card numbers are rejected on most Stripe accounts unless Stripe has explicitly enabled raw card data APIs.

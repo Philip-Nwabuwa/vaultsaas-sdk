@@ -70,10 +70,7 @@ const result = await vault.charge({
   currency: 'USD',
   paymentMethod: {
     type: 'card',
-    number: '4242424242424242',
-    expMonth: 12,
-    expYear: 2030,
-    cvc: '123',
+    token: 'pm_card_visa',
   },
   customer: {
     email: 'buyer@example.com',
