@@ -72,6 +72,48 @@ dlocal: {
 
 ---
 
+## 1.5 Stripe raw card data rejected in test mode
+
+**Symptom:** `VaultError` with `code: INVALID_REQUEST` and Stripe message:
+`Sending credit card numbers directly to the Stripe API is generally unsafe...`
+
+**Cause:** The request includes raw card fields (`number`, `expMonth`, `expYear`, `cvc`). Stripe blocks raw card data APIs by default for most accounts.
+
+**Solution:** Use Stripe test payment method tokens for SDK examples:
+
+```ts
+paymentMethod: {
+  type: 'card',
+  token: 'pm_card_visa',
+},
+```
+
+Use `pm_card_chargeDeclined` when you want to simulate a decline path. Only send raw card numbers if Stripe has explicitly enabled raw card data APIs for your account.
+
+---
+
+## 1.6 Paystack `unprocessed_transaction` / "Charge attempted"
+
+**Symptom:** `VaultError` with `code: INVALID_REQUEST` and Paystack context containing `providerCode: 'unprocessed_transaction'` and message `"Charge attempted"`.
+
+**Cause:** The charge request used a non-reusable or placeholder authorization token, or the token/email pair does not match Paystack's stored authorization.
+
+**Solution:**
+- Pass a real Paystack `authorization.authorization_code` as `paymentMethod.token`.
+- Ensure `customer.email` matches the customer linked to that authorization code.
+- For test mode, avoid tiny first amounts and use at least NGN 50.00 (`amount: 5000` kobo) when validating the flow.
+
+```ts
+await vault.charge({
+  amount: 5000,
+  currency: 'NGN',
+  paymentMethod: { type: 'card', token: process.env.PAYSTACK_AUTHORIZATION_CODE! },
+  customer: { email: process.env.PAYSTACK_CUSTOMER_EMAIL! },
+});
+```
+
+---
+
 ## 2. Webhook Signature Verification Failures
 
 ### Wrong webhook secret

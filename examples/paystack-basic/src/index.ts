@@ -25,14 +25,17 @@ const client = new VaultClient({
 });
 
 const result = await client.charge({
-  amount: 2500,
+  // Amount in kobo; use >= 5000 (NGN 50.00) for stable test runs.
+  amount: 5000,
   currency: 'NGN',
   paymentMethod: {
     type: 'card',
-    token: 'AUTH_test_123',
+    // Must be a real Paystack authorization_code from a prior successful charge.
+    token: mustEnv('PAYSTACK_AUTHORIZATION_CODE'),
   },
   customer: {
-    email: 'buyer@example.com',
+    // Must match the customer email associated with the authorization_code.
+    email: mustEnv('PAYSTACK_CUSTOMER_EMAIL'),
   },
   metadata: {
     source: 'example_paystack_basic',
