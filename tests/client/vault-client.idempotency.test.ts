@@ -222,6 +222,18 @@ describe('VaultClient idempotency', () => {
         idempotencyKey: 'idk_conflict',
       }),
     ).rejects.toBeInstanceOf(VaultIdempotencyConflictError);
+    await expect(
+      client.charge({
+        amount: 2000,
+        currency: 'USD',
+        paymentMethod: { type: 'pix' },
+        idempotencyKey: 'idk_conflict',
+      }),
+    ).rejects.toMatchObject({
+      code: 'IDEMPOTENCY_CONFLICT',
+      category: 'invalid_request',
+      retriable: false,
+    });
 
     expect(counter.chargeCalls).toBe(1);
   });

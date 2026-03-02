@@ -1,8 +1,9 @@
 import {
   VaultConfigError,
+  VaultError,
   VaultIdempotencyConflictError,
-  VaultProviderError,
   VaultRoutingError,
+  mapProviderError,
 } from '../errors';
 import {
   DEFAULT_IDEMPOTENCY_TTL_MS,
@@ -66,7 +67,10 @@ export class VaultClient {
           throw new VaultConfigError(
             'Provider adapter constructor is missing.',
             {
-              provider: name,
+              code: 'PROVIDER_NOT_CONFIGURED',
+              context: {
+                provider: name,
+              },
             },
           );
         }
@@ -235,7 +239,10 @@ export class VaultClient {
         throw new VaultRoutingError(
           'Forced provider is listed in routing exclusions.',
           {
-            provider: request.routing.provider,
+            code: 'ROUTING_PROVIDER_EXCLUDED',
+            context: {
+              provider: request.routing.provider,
+            },
           },
         );
       }
@@ -302,7 +309,10 @@ export class VaultClient {
     const adapter = this.adapters.get(provider);
     if (!adapter) {
       throw new VaultRoutingError('Provider is not configured or enabled.', {
-        provider,
+        code: 'ROUTING_PROVIDER_UNAVAILABLE',
+        context: {
+          provider,
+        },
       });
     }
 
@@ -402,18 +412,13 @@ export class VaultClient {
     try {
       return await execute();
     } catch (error) {
-      if (
-        error instanceof VaultConfigError ||
-        error instanceof VaultRoutingError ||
-        error instanceof VaultProviderError
-      ) {
+      if (error instanceof VaultError) {
         throw error;
       }
 
-      throw new VaultProviderError('Provider operation failed.', {
+      throw mapProviderError(error, {
         provider,
         operation,
-        cause: error instanceof Error ? error.message : String(error),
       });
     }
   }

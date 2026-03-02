@@ -18,6 +18,35 @@ bun run build
 - `bun run build`
 - `bun run release:dry-run`
 
+## Error Handling
+
+All SDK failures are thrown as `VaultError` instances with:
+
+- `code`
+- `category`
+- `suggestion`
+- `docsUrl`
+- `retriable`
+- `context`
+
+```ts
+import { VaultError } from '@vaultsaas/core';
+
+try {
+  await vault.charge({
+    amount: 2500,
+    currency: 'USD',
+    paymentMethod: { type: 'card' },
+  });
+} catch (error) {
+  if (error instanceof VaultError) {
+    console.log(error.code, error.category);
+    console.log(error.suggestion);
+    console.log(error.docsUrl);
+  }
+}
+```
+
 ## License
 
 MIT

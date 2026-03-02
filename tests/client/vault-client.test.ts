@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { VaultClient } from '../../src/client';
+import { VaultNetworkError } from '../../src/errors';
 import type {
   CaptureRequest,
   ChargeRequest,
@@ -140,6 +141,24 @@ class TestAdapter implements PaymentAdapter {
   }
 }
 
+class RateLimitedAdapter extends TestAdapter {
+  async charge(_request: ChargeRequest): Promise<PaymentResult> {
+    throw {
+      message: 'Too many requests',
+      status: 429,
+      providerCode: 'rate_limit',
+    };
+  }
+}
+
+class TimeoutAdapter extends TestAdapter {
+  async charge(_request: ChargeRequest): Promise<PaymentResult> {
+    const error = new Error('socket timeout') as Error & { code: string };
+    error.code = 'ETIMEDOUT';
+    throw error;
+  }
+}
+
 function createClient(): VaultClient {
   return new VaultClient({
     providers: {
@@ -157,6 +176,22 @@ function createClient(): VaultClient {
         { match: { currency: 'BRL' }, provider: 'dlocal' },
         { match: { default: true }, provider: 'stripe' },
       ],
+    },
+  });
+}
+
+function createSingleProviderClient(
+  adapter: new (config: Record<string, unknown>) => PaymentAdapter,
+): VaultClient {
+  return new VaultClient({
+    providers: {
+      stripe: {
+        adapter,
+        config: { providerName: 'stripe' },
+      },
+    },
+    routing: {
+      rules: [{ match: { default: true }, provider: 'stripe' }],
     },
   });
 }
@@ -201,5 +236,49 @@ describe('VaultClient', () => {
 
     expect(event.provider).toBe('stripe');
     expect(event.type).toBe('payment.completed');
+  });
+
+  it('maps provider failures to canonical VaultProviderError values', async () => {
+    const client = createSingleProviderClient(RateLimitedAdapter);
+
+    await expect(
+      client.charge({
+        amount: 1000,
+        currency: 'USD',
+        paymentMethod: { type: 'card' },
+      }),
+    ).rejects.toMatchObject({
+      code: 'RATE_LIMITED',
+      category: 'rate_limited',
+      retriable: true,
+      context: {
+        provider: 'stripe',
+        operation: 'charge',
+      },
+    });
+  });
+
+  it('maps timeout failures to VaultNetworkError', async () => {
+    const client = createSingleProviderClient(TimeoutAdapter);
+
+    await expect(
+      client.charge({
+        amount: 1000,
+        currency: 'USD',
+        paymentMethod: { type: 'card' },
+      }),
+    ).rejects.toBeInstanceOf(VaultNetworkError);
+
+    await expect(
+      client.charge({
+        amount: 1000,
+        currency: 'USD',
+        paymentMethod: { type: 'card' },
+      }),
+    ).rejects.toMatchObject({
+      code: 'PROVIDER_TIMEOUT',
+      category: 'network_error',
+      retriable: true,
+    });
   });
 });
