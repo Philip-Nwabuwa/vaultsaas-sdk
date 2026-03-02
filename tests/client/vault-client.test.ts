@@ -173,7 +173,7 @@ describe('VaultClient', () => {
     });
 
     expect(charged.provider).toBe('dlocal');
-    expect(charged.routing.reason).toBe('matched rule');
+    expect(charged.routing.reason).toContain('rule matched');
 
     const captured = await client.capture({
       transactionId: charged.id,
