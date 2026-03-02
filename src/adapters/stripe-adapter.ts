@@ -664,8 +664,21 @@ export class StripeAdapter implements PaymentAdapter {
       body.receipt_email = request.customer.email;
     }
 
-    if (request.customer?.name) {
-      body['shipping[name]'] = request.customer.name;
+    if (request.customer?.address) {
+      const { address, name } = request.customer;
+      if (name) {
+        body['shipping[name]'] = name;
+      }
+      body['shipping[address][line1]'] = address.line1;
+      if (address.line2) {
+        body['shipping[address][line2]'] = address.line2;
+      }
+      body['shipping[address][city]'] = address.city;
+      if (address.state) {
+        body['shipping[address][state]'] = address.state;
+      }
+      body['shipping[address][postal_code]'] = address.postalCode;
+      body['shipping[address][country]'] = address.country;
     }
 
     const intent = await this.postForm<StripePaymentIntent>(

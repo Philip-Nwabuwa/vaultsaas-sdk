@@ -206,6 +206,87 @@ describe('StripeAdapter', () => {
       expect(body).toContain('receipt_email=');
     });
 
+    it('does not send shipping fields when only customer name is provided', async () => {
+      const { adapter, fetchFn } = makeAdapter();
+      fetchFn.mockResolvedValue(createJsonResponse(stripeIntent()));
+
+      await adapter.charge({
+        amount: 100,
+        currency: 'USD',
+        paymentMethod: CARD_TOKEN,
+        customer: { name: 'Taylor Buyer' },
+      });
+
+      const body = String(
+        (fetchFn.mock.calls[0]?.[1] as RequestInit | undefined)?.body,
+      );
+      expect(body).not.toContain('shipping%5Bname%5D');
+      expect(body).not.toContain('shipping%5Baddress%5D');
+    });
+
+    it('sends shipping name and address when customer address is provided', async () => {
+      const { adapter, fetchFn } = makeAdapter();
+      fetchFn.mockResolvedValue(createJsonResponse(stripeIntent()));
+
+      await adapter.charge({
+        amount: 100,
+        currency: 'USD',
+        paymentMethod: CARD_TOKEN,
+        customer: {
+          name: 'Taylor Buyer',
+          address: {
+            line1: '510 Townsend St',
+            line2: 'Suite 200',
+            city: 'San Francisco',
+            state: 'CA',
+            postalCode: '94103',
+            country: 'US',
+          },
+        },
+      });
+
+      const body = String(
+        (fetchFn.mock.calls[0]?.[1] as RequestInit | undefined)?.body,
+      );
+      const params = new URLSearchParams(body);
+      expect(params.get('shipping[name]')).toBe('Taylor Buyer');
+      expect(params.get('shipping[address][line1]')).toBe('510 Townsend St');
+      expect(params.get('shipping[address][line2]')).toBe('Suite 200');
+      expect(params.get('shipping[address][city]')).toBe('San Francisco');
+      expect(params.get('shipping[address][state]')).toBe('CA');
+      expect(params.get('shipping[address][postal_code]')).toBe('94103');
+      expect(params.get('shipping[address][country]')).toBe('US');
+    });
+
+    it('sends shipping address without shipping name when name is not provided', async () => {
+      const { adapter, fetchFn } = makeAdapter();
+      fetchFn.mockResolvedValue(createJsonResponse(stripeIntent()));
+
+      await adapter.charge({
+        amount: 100,
+        currency: 'USD',
+        paymentMethod: CARD_TOKEN,
+        customer: {
+          address: {
+            line1: '510 Townsend St',
+            city: 'San Francisco',
+            postalCode: '94103',
+            country: 'US',
+          },
+        },
+      });
+
+      const body = String(
+        (fetchFn.mock.calls[0]?.[1] as RequestInit | undefined)?.body,
+      );
+      const params = new URLSearchParams(body);
+      expect(params.get('shipping[name]')).toBeNull();
+      expect(params.get('shipping[address][line1]')).toBe('510 Townsend St');
+      expect(params.get('shipping[address][city]')).toBe('San Francisco');
+      expect(params.get('shipping[address][postal_code]')).toBe('94103');
+      expect(params.get('shipping[address][country]')).toBe('US');
+    });
+
     it('sends raw card data in payment_method_data', async () => {
       const { adapter, fetchFn } = makeAdapter();
       fetchFn.mockResolvedValue(createJsonResponse(stripeIntent()));

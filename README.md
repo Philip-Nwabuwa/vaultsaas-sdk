@@ -103,6 +103,8 @@ Run:
 STRIPE_API_KEY=sk_test_xxx bun quickstart.ts
 ```
 
+Note: if you include `customer.name` for Stripe shipping details, also include `customer.address` to avoid provider validation errors.
+
 ## Documentation
 
 - [Routing](./docs/routing.md)

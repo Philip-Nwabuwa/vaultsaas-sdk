@@ -54,6 +54,7 @@ Stripe verification enforces:
 - Using parsed JSON instead of raw webhook body breaks signature verification.
 - Mixing test keys with live mode endpoints causes auth failures.
 - Omitting `webhookSecret` prevents webhook signature verification.
+- If you send customer shipping details, send a complete `address` object (line1, city, postalCode, country). Sending only a shipping name can be rejected by Stripe as an invalid request.
 
 ## Test Mode Notes
 
