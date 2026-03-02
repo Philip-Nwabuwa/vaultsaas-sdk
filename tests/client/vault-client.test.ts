@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VaultClient } from '../../src/client';
 import { VaultNetworkError } from '../../src/errors';
 import type {
@@ -197,6 +197,10 @@ function createSingleProviderClient(
 }
 
 describe('VaultClient', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('routes charge by rule and reuses transaction provider for capture', async () => {
     const client = createClient();
 
@@ -280,5 +284,90 @@ describe('VaultClient', () => {
       category: 'network_error',
       retriable: true,
     });
+  });
+
+  it('uses platform routing decision when available', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          provider: 'dlocal',
+          source: 'smart',
+          reason: 'Platform selected dlocal.',
+          decisionId: 'dec_123',
+        }),
+        {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+          },
+        },
+      ),
+    );
+
+    const client = new VaultClient({
+      providers: {
+        stripe: {
+          adapter: TestAdapter,
+          config: { providerName: 'stripe' },
+        },
+        dlocal: {
+          adapter: TestAdapter,
+          config: { providerName: 'dlocal' },
+        },
+      },
+      routing: {
+        rules: [{ match: { default: true }, provider: 'stripe' }],
+      },
+      platformApiKey: 'pk_test_123',
+      platform: {
+        baseUrl: 'https://platform.test',
+      },
+    });
+
+    const result = await client.charge({
+      amount: 1200,
+      currency: 'USD',
+      paymentMethod: { type: 'card', token: 'tok_test' },
+    });
+
+    expect(result.provider).toBe('dlocal');
+    expect(result.routing.source).toBe('platform');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to local routing when platform request fails', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('network down'));
+
+    const client = new VaultClient({
+      providers: {
+        stripe: {
+          adapter: TestAdapter,
+          config: { providerName: 'stripe' },
+        },
+        dlocal: {
+          adapter: TestAdapter,
+          config: { providerName: 'dlocal' },
+        },
+      },
+      routing: {
+        rules: [{ match: { default: true }, provider: 'stripe' }],
+      },
+      platformApiKey: 'pk_test_123',
+      platform: {
+        baseUrl: 'https://platform.test',
+      },
+    });
+
+    const result = await client.charge({
+      amount: 1200,
+      currency: 'USD',
+      paymentMethod: { type: 'card', token: 'tok_test' },
+    });
+
+    expect(result.provider).toBe('stripe');
+    expect(result.routing.source).toBe('local');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

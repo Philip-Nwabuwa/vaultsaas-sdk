@@ -26,6 +26,14 @@ export interface VaultConfig {
     ttlMs?: number;
   };
   platformApiKey?: string;
+  platform?: {
+    baseUrl?: string;
+    timeoutMs?: number;
+    batchSize?: number;
+    flushIntervalMs?: number;
+    maxRetries?: number;
+    initialBackoffMs?: number;
+  };
   logging?: {
     level?: 'silent' | 'error' | 'warn' | 'info' | 'debug';
     logger?: LoggerInterface;

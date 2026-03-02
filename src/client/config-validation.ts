@@ -248,6 +248,52 @@ export function validateVaultConfig(config: VaultConfig): void {
     throw new VaultConfigError('platformApiKey cannot be empty when provided.');
   }
 
+  if (config.platform) {
+    if (
+      config.platform.baseUrl !== undefined &&
+      config.platform.baseUrl.trim() === ''
+    ) {
+      throw new VaultConfigError(
+        'platform.baseUrl cannot be empty when provided.',
+      );
+    }
+
+    if (config.platform.timeoutMs !== undefined) {
+      assertPositiveFiniteInteger(
+        config.platform.timeoutMs,
+        'platform.timeoutMs',
+      );
+    }
+
+    if (config.platform.batchSize !== undefined) {
+      assertPositiveFiniteInteger(
+        config.platform.batchSize,
+        'platform.batchSize',
+      );
+    }
+
+    if (config.platform.flushIntervalMs !== undefined) {
+      assertPositiveFiniteInteger(
+        config.platform.flushIntervalMs,
+        'platform.flushIntervalMs',
+      );
+    }
+
+    if (config.platform.maxRetries !== undefined) {
+      assertPositiveFiniteInteger(
+        config.platform.maxRetries,
+        'platform.maxRetries',
+      );
+    }
+
+    if (config.platform.initialBackoffMs !== undefined) {
+      assertPositiveFiniteInteger(
+        config.platform.initialBackoffMs,
+        'platform.initialBackoffMs',
+      );
+    }
+  }
+
   if (config.logging?.level && !LOG_LEVELS.has(config.logging.level)) {
     throw new VaultConfigError('Invalid logging level configured.', {
       level: config.logging.level,

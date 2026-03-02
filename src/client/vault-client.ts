@@ -11,6 +11,7 @@ import {
   MemoryIdempotencyStore,
   hashIdempotencyPayload,
 } from '../idempotency';
+import { PlatformConnector, type PlatformTransactionReport } from '../platform';
 import { Router } from '../router';
 import type {
   AuthorizeRequest,
@@ -38,6 +39,7 @@ interface ResolvedProvider {
   provider: string;
   source: 'local' | 'platform';
   reason: string;
+  decisionId?: string;
 }
 
 interface IdempotentRequest {
@@ -49,6 +51,7 @@ export class VaultClient {
   private readonly adapters = new Map<string, PaymentAdapter>();
   private readonly providerOrder: string[];
   private readonly router: Router | null;
+  private readonly platformConnector: PlatformConnector | null;
   private readonly idempotencyStore: IdempotencyStore;
   private readonly idempotencyTtlMs: number;
   private readonly transactionProviderIndex = new Map<string, string>();
@@ -86,6 +89,18 @@ export class VaultClient {
     this.router = config.routing?.rules?.length
       ? new Router(config.routing.rules)
       : null;
+    this.platformConnector = config.platformApiKey
+      ? new PlatformConnector({
+          apiKey: config.platformApiKey,
+          baseUrl: config.platform?.baseUrl,
+          timeoutMs: config.platform?.timeoutMs,
+          batchSize: config.platform?.batchSize,
+          flushIntervalMs: config.platform?.flushIntervalMs,
+          maxRetries: config.platform?.maxRetries,
+          initialBackoffMs: config.platform?.initialBackoffMs,
+          logger: config.logging?.logger,
+        })
+      : null;
     this.idempotencyStore =
       config.idempotency?.store ?? new MemoryIdempotencyStore();
     this.idempotencyTtlMs =
@@ -94,30 +109,68 @@ export class VaultClient {
 
   async charge(request: ChargeRequest): Promise<PaymentResult> {
     return this.executeIdempotentOperation('charge', request, async () => {
-      const route = this.resolveProviderForCharge(request);
+      const route = await this.resolveProviderForCharge(request);
       const adapter = this.getAdapter(route.provider);
+      const startedAt = Date.now();
       const result = await this.wrapProviderCall(route.provider, 'charge', () =>
         adapter.charge(request),
       );
+      const latencyMs = Date.now() - startedAt;
 
       const normalized = this.withRouting(result, route, request);
       this.transactionProviderIndex.set(normalized.id, route.provider);
+      this.queueTransactionReport({
+        id: normalized.id,
+        provider: normalized.provider,
+        providerId: normalized.providerId,
+        status: normalized.status,
+        amount: normalized.amount,
+        currency: normalized.currency,
+        country: request.customer?.address?.country,
+        paymentMethod: normalized.paymentMethod.type,
+        cardBin: this.extractCardBin(request),
+        cardBrand: normalized.paymentMethod.brand,
+        latencyMs,
+        routingSource: normalized.routing.source,
+        routingDecisionId: route.decisionId,
+        idempotencyKey: request.idempotencyKey,
+        timestamp: normalized.createdAt,
+      });
       return normalized;
     });
   }
 
   async authorize(request: AuthorizeRequest): Promise<PaymentResult> {
     return this.executeIdempotentOperation('authorize', request, async () => {
-      const route = this.resolveProviderForCharge(request);
+      const route = await this.resolveProviderForCharge(request);
       const adapter = this.getAdapter(route.provider);
+      const startedAt = Date.now();
       const result = await this.wrapProviderCall(
         route.provider,
         'authorize',
         () => adapter.authorize(request),
       );
+      const latencyMs = Date.now() - startedAt;
 
       const normalized = this.withRouting(result, route, request);
       this.transactionProviderIndex.set(normalized.id, route.provider);
+      this.queueTransactionReport({
+        id: normalized.id,
+        provider: normalized.provider,
+        providerId: normalized.providerId,
+        status: normalized.status,
+        amount: normalized.amount,
+        currency: normalized.currency,
+        country: request.customer?.address?.country,
+        paymentMethod: normalized.paymentMethod.type,
+        cardBin: this.extractCardBin(request),
+        cardBrand: normalized.paymentMethod.brand,
+        latencyMs,
+        routingSource: normalized.routing.source,
+        routingDecisionId: route.decisionId,
+        idempotencyKey: request.idempotencyKey,
+        timestamp: normalized.createdAt,
+      });
       return normalized;
     });
   }
@@ -128,9 +181,11 @@ export class VaultClient {
         request.transactionId,
       );
       const adapter = this.getAdapter(provider);
+      const startedAt = Date.now();
       const result = await this.wrapProviderCall(provider, 'capture', () =>
         adapter.capture(request),
       );
+      const latencyMs = Date.now() - startedAt;
 
       const normalized = this.withRouting(result, {
         provider,
@@ -139,6 +194,20 @@ export class VaultClient {
       });
 
       this.transactionProviderIndex.set(normalized.id, provider);
+      this.queueTransactionReport({
+        id: normalized.id,
+        provider: normalized.provider,
+        providerId: normalized.providerId,
+        status: normalized.status,
+        amount: normalized.amount,
+        currency: normalized.currency,
+        paymentMethod: normalized.paymentMethod.type,
+        cardBrand: normalized.paymentMethod.brand,
+        latencyMs,
+        routingSource: normalized.routing.source,
+        idempotencyKey: request.idempotencyKey,
+        timestamp: normalized.createdAt,
+      });
       return normalized;
     });
   }
@@ -149,10 +218,24 @@ export class VaultClient {
         request.transactionId,
       );
       const adapter = this.getAdapter(provider);
-
-      return this.wrapProviderCall(provider, 'refund', () =>
+      const startedAt = Date.now();
+      const result = await this.wrapProviderCall(provider, 'refund', () =>
         adapter.refund(request),
       );
+      const latencyMs = Date.now() - startedAt;
+
+      this.queueTransactionReport({
+        id: result.id,
+        provider: result.provider,
+        providerId: result.providerId,
+        status: result.status,
+        amount: result.amount,
+        currency: result.currency,
+        latencyMs,
+        idempotencyKey: request.idempotencyKey,
+        timestamp: result.createdAt,
+      });
+      return result;
     });
   }
 
@@ -162,21 +245,43 @@ export class VaultClient {
         request.transactionId,
       );
       const adapter = this.getAdapter(provider);
-
-      return this.wrapProviderCall(provider, 'void', () =>
+      const result = await this.wrapProviderCall(provider, 'void', () =>
         adapter.void(request),
       );
+      this.queueTransactionReport({
+        id: result.id,
+        provider: result.provider,
+        status: result.status,
+        amount: 0,
+        currency: 'N/A',
+        idempotencyKey: request.idempotencyKey,
+        timestamp: result.createdAt,
+      });
+
+      return result;
     });
   }
 
   async getStatus(transactionId: string): Promise<TransactionStatus> {
     const provider = this.resolveProviderForTransaction(transactionId);
     const adapter = this.getAdapter(provider);
+    const startedAt = Date.now();
     const status = await this.wrapProviderCall(provider, 'getStatus', () =>
       adapter.getStatus(transactionId),
     );
+    const latencyMs = Date.now() - startedAt;
 
     this.transactionProviderIndex.set(status.id, provider);
+    this.queueTransactionReport({
+      id: status.id,
+      provider: status.provider,
+      providerId: status.providerId,
+      status: status.status,
+      amount: status.amount,
+      currency: status.currency,
+      latencyMs,
+      timestamp: status.updatedAt,
+    });
     return status;
   }
 
@@ -220,6 +325,7 @@ export class VaultClient {
         this.transactionProviderIndex.set(event.transactionId, provider);
       }
 
+      this.queueWebhookEvent(event);
       return event;
     }
 
@@ -230,10 +336,13 @@ export class VaultClient {
       this.transactionProviderIndex.set(event.transactionId, provider);
     }
 
+    this.queueWebhookEvent(event);
     return event;
   }
 
-  private resolveProviderForCharge(request: ChargeRequest): ResolvedProvider {
+  private async resolveProviderForCharge(
+    request: ChargeRequest,
+  ): Promise<ResolvedProvider> {
     if (request.routing?.provider) {
       if (request.routing.exclude?.includes(request.routing.provider)) {
         throw new VaultRoutingError(
@@ -253,6 +362,11 @@ export class VaultClient {
         source: 'local',
         reason: 'forced provider',
       };
+    }
+
+    const platformDecision = await this.resolveProviderFromPlatform(request);
+    if (platformDecision) {
+      return platformDecision;
     }
 
     const context: RoutingContext = {
@@ -287,6 +401,50 @@ export class VaultClient {
       source: 'local',
       reason: 'fallback provider',
     };
+  }
+
+  private async resolveProviderFromPlatform(
+    request: ChargeRequest,
+  ): Promise<ResolvedProvider | null> {
+    if (!this.platformConnector) {
+      return null;
+    }
+
+    try {
+      const decision = await this.platformConnector.decideRouting({
+        currency: request.currency,
+        country: request.customer?.address?.country,
+        amount: request.amount,
+        paymentMethod: request.paymentMethod.type,
+        cardBin: this.extractCardBin(request),
+        metadata: request.metadata,
+      });
+
+      if (!decision?.provider) {
+        return null;
+      }
+
+      if (request.routing?.exclude?.includes(decision.provider)) {
+        return null;
+      }
+
+      this.getAdapter(decision.provider);
+      return {
+        provider: decision.provider,
+        source: 'platform',
+        reason: decision.reason ?? 'platform routing decision',
+        decisionId: decision.decisionId,
+      };
+    } catch (error) {
+      this.config.logging?.logger?.warn(
+        'Platform routing unavailable. Falling back to local routing.',
+        {
+          operation: 'resolveProviderForCharge',
+          cause: error instanceof Error ? error.message : String(error),
+        },
+      );
+      return null;
+    }
   }
 
   private resolveProviderForTransaction(transactionId: string): string {
@@ -355,6 +513,44 @@ export class VaultClient {
         },
       };
     }
+  }
+
+  private extractCardBin(request: ChargeRequest): string | undefined {
+    if (
+      request.paymentMethod.type === 'card' &&
+      'number' in request.paymentMethod
+    ) {
+      const digits = request.paymentMethod.number.replace(/\D/g, '');
+      if (digits.length >= 6) {
+        return digits.slice(0, 6);
+      }
+    }
+
+    return undefined;
+  }
+
+  private queueTransactionReport(report: PlatformTransactionReport): void {
+    if (!this.platformConnector) {
+      return;
+    }
+
+    this.platformConnector.queueTransactionReport(report);
+  }
+
+  private queueWebhookEvent(event: VaultEvent): void {
+    if (!this.platformConnector) {
+      return;
+    }
+
+    this.platformConnector.queueWebhookEvent({
+      id: event.id,
+      type: event.type,
+      provider: event.provider,
+      transactionId: event.transactionId,
+      providerEventId: event.providerEventId,
+      data: event.data,
+      timestamp: event.timestamp,
+    });
   }
 
   private async executeIdempotentOperation<

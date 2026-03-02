@@ -181,4 +181,29 @@ describe('VaultClient config validation', () => {
       'idempotency.ttlMs must be a positive integer.',
     );
   });
+
+  it('throws for invalid platform timeout', () => {
+    const config = baseConfig();
+    config.platform = {
+      timeoutMs: 0,
+    };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'platform.timeoutMs must be a positive integer.',
+    );
+  });
+
+  it('throws for empty platform baseUrl', () => {
+    const config = baseConfig();
+    config.platformApiKey = 'pk_test_123';
+    config.platform = {
+      baseUrl: '   ',
+    };
+
+    expect(() => new VaultClient(config)).toThrow(VaultConfigError);
+    expect(() => new VaultClient(config)).toThrow(
+      'platform.baseUrl cannot be empty when provided.',
+    );
+  });
 });
