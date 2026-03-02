@@ -21,8 +21,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "docs:check": "bun ./scripts/release-readiness.mjs --mode=docs",
+    "package:check": "bun ./scripts/release-readiness.mjs --mode=package",
     "build": "tsup",
-    "release:dry-run": "bun pm pack --dry-run"
+    "release:verify": "bun run lint && bun run typecheck && bun run test && bun run docs:check && bun run build && bun run package:check",
+    "release:dry-run": "bun run release:verify && bun pm pack --dry-run"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

@@ -58,9 +58,16 @@ await vault.charge({
 
 ## Release process guidance
 
-- Add a changeset for user-facing changes: `bunx changeset`.
-- Keep changelog entries actionable and migration-focused.
-- Do not publish breaking removals without:
-  - a prior deprecation cycle
-  - migration docs
-  - major version bump
+1. Add a changeset for user-facing changes: `bunx changeset`.
+2. Confirm version bump type follows SemVer policy (major/minor/patch).
+3. Keep changelog entries actionable and migration-focused.
+4. Run release gates locally:
+   - `bun run release:verify`
+   - `bun run release:dry-run`
+5. Publish only from the release workflow after CI + docs + package gates pass.
+
+Do not publish breaking removals without:
+
+- a prior deprecation cycle
+- migration docs
+- major version bump
