@@ -24,6 +24,7 @@ import {
   type ProviderWebhookPayload,
   normalizeWebhookEvent,
 } from '../webhooks';
+import { validateVaultConfig } from './config-validation';
 
 interface ResolvedProvider {
   provider: string;
@@ -39,12 +40,10 @@ export class VaultClient {
   private readonly transactionProviderIndex = new Map<string, string>();
 
   constructor(config: VaultConfig) {
+    validateVaultConfig(config);
     this.config = config;
 
-    const entries = Object.entries(config.providers ?? {});
-    if (entries.length === 0) {
-      throw new VaultConfigError('At least one provider must be configured.');
-    }
+    const entries = Object.entries(config.providers);
 
     this.providerOrder = entries
       .filter(([, provider]) => provider.enabled !== false)
