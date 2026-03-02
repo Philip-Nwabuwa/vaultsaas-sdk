@@ -1,3 +1,5 @@
+export const DEFAULT_IDEMPOTENCY_TTL_MS = 86_400_000;
+
 export interface IdempotencyRecord<T = unknown> {
   key: string;
   payloadHash: string;

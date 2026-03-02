@@ -92,3 +92,16 @@ export class WebhookVerificationError extends VaultError {
     this.name = 'WebhookVerificationError';
   }
 }
+
+export class VaultIdempotencyConflictError extends VaultError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, {
+      code: 'IDEMPOTENCY_CONFLICT',
+      category: 'validation',
+      suggestion:
+        'Reuse the same payload for a given idempotency key or generate a new key.',
+      context,
+    });
+    this.name = 'VaultIdempotencyConflictError';
+  }
+}

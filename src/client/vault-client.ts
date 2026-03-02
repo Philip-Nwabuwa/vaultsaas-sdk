@@ -1,8 +1,15 @@
 import {
   VaultConfigError,
+  VaultIdempotencyConflictError,
   VaultProviderError,
   VaultRoutingError,
 } from '../errors';
+import {
+  DEFAULT_IDEMPOTENCY_TTL_MS,
+  type IdempotencyStore,
+  MemoryIdempotencyStore,
+  hashIdempotencyPayload,
+} from '../idempotency';
 import { Router } from '../router';
 import type {
   AuthorizeRequest,
@@ -32,11 +39,17 @@ interface ResolvedProvider {
   reason: string;
 }
 
+interface IdempotentRequest {
+  idempotencyKey?: string;
+}
+
 export class VaultClient {
   readonly config: VaultConfig;
   private readonly adapters = new Map<string, PaymentAdapter>();
   private readonly providerOrder: string[];
   private readonly router: Router | null;
+  private readonly idempotencyStore: IdempotencyStore;
+  private readonly idempotencyTtlMs: number;
   private readonly transactionProviderIndex = new Map<string, string>();
 
   constructor(config: VaultConfig) {
@@ -69,65 +82,87 @@ export class VaultClient {
     this.router = config.routing?.rules?.length
       ? new Router(config.routing.rules)
       : null;
+    this.idempotencyStore =
+      config.idempotency?.store ?? new MemoryIdempotencyStore();
+    this.idempotencyTtlMs =
+      config.idempotency?.ttlMs ?? DEFAULT_IDEMPOTENCY_TTL_MS;
   }
 
   async charge(request: ChargeRequest): Promise<PaymentResult> {
-    const route = this.resolveProviderForCharge(request);
-    const adapter = this.getAdapter(route.provider);
-    const result = await this.wrapProviderCall(route.provider, 'charge', () =>
-      adapter.charge(request),
-    );
+    return this.executeIdempotentOperation('charge', request, async () => {
+      const route = this.resolveProviderForCharge(request);
+      const adapter = this.getAdapter(route.provider);
+      const result = await this.wrapProviderCall(route.provider, 'charge', () =>
+        adapter.charge(request),
+      );
 
-    const normalized = this.withRouting(result, route, request);
-    this.transactionProviderIndex.set(normalized.id, route.provider);
-    return normalized;
+      const normalized = this.withRouting(result, route, request);
+      this.transactionProviderIndex.set(normalized.id, route.provider);
+      return normalized;
+    });
   }
 
   async authorize(request: AuthorizeRequest): Promise<PaymentResult> {
-    const route = this.resolveProviderForCharge(request);
-    const adapter = this.getAdapter(route.provider);
-    const result = await this.wrapProviderCall(
-      route.provider,
-      'authorize',
-      () => adapter.authorize(request),
-    );
+    return this.executeIdempotentOperation('authorize', request, async () => {
+      const route = this.resolveProviderForCharge(request);
+      const adapter = this.getAdapter(route.provider);
+      const result = await this.wrapProviderCall(
+        route.provider,
+        'authorize',
+        () => adapter.authorize(request),
+      );
 
-    const normalized = this.withRouting(result, route, request);
-    this.transactionProviderIndex.set(normalized.id, route.provider);
-    return normalized;
+      const normalized = this.withRouting(result, route, request);
+      this.transactionProviderIndex.set(normalized.id, route.provider);
+      return normalized;
+    });
   }
 
   async capture(request: CaptureRequest): Promise<PaymentResult> {
-    const provider = this.resolveProviderForTransaction(request.transactionId);
-    const adapter = this.getAdapter(provider);
-    const result = await this.wrapProviderCall(provider, 'capture', () =>
-      adapter.capture(request),
-    );
+    return this.executeIdempotentOperation('capture', request, async () => {
+      const provider = this.resolveProviderForTransaction(
+        request.transactionId,
+      );
+      const adapter = this.getAdapter(provider);
+      const result = await this.wrapProviderCall(provider, 'capture', () =>
+        adapter.capture(request),
+      );
 
-    const normalized = this.withRouting(result, {
-      provider,
-      source: 'local',
-      reason: 'transaction provider lookup',
+      const normalized = this.withRouting(result, {
+        provider,
+        source: 'local',
+        reason: 'transaction provider lookup',
+      });
+
+      this.transactionProviderIndex.set(normalized.id, provider);
+      return normalized;
     });
-
-    this.transactionProviderIndex.set(normalized.id, provider);
-    return normalized;
   }
 
   async refund(request: RefundRequest): Promise<RefundResult> {
-    const provider = this.resolveProviderForTransaction(request.transactionId);
-    const adapter = this.getAdapter(provider);
+    return this.executeIdempotentOperation('refund', request, async () => {
+      const provider = this.resolveProviderForTransaction(
+        request.transactionId,
+      );
+      const adapter = this.getAdapter(provider);
 
-    return this.wrapProviderCall(provider, 'refund', () =>
-      adapter.refund(request),
-    );
+      return this.wrapProviderCall(provider, 'refund', () =>
+        adapter.refund(request),
+      );
+    });
   }
 
   async void(request: VoidRequest): Promise<VoidResult> {
-    const provider = this.resolveProviderForTransaction(request.transactionId);
-    const adapter = this.getAdapter(provider);
+    return this.executeIdempotentOperation('void', request, async () => {
+      const provider = this.resolveProviderForTransaction(
+        request.transactionId,
+      );
+      const adapter = this.getAdapter(provider);
 
-    return this.wrapProviderCall(provider, 'void', () => adapter.void(request));
+      return this.wrapProviderCall(provider, 'void', () =>
+        adapter.void(request),
+      );
+    });
   }
 
   async getStatus(transactionId: string): Promise<TransactionStatus> {
@@ -310,6 +345,53 @@ export class VaultClient {
         },
       };
     }
+  }
+
+  private async executeIdempotentOperation<
+    TRequest extends IdempotentRequest,
+    TResult,
+  >(
+    operation: string,
+    request: TRequest,
+    execute: () => Promise<TResult>,
+  ): Promise<TResult> {
+    const key = request.idempotencyKey;
+    if (!key) {
+      return execute();
+    }
+
+    await this.idempotencyStore.clearExpired();
+
+    const payloadHash = hashIdempotencyPayload({
+      operation,
+      request,
+    });
+    const existingRecord = await this.idempotencyStore.get(key);
+
+    if (existingRecord) {
+      if (existingRecord.payloadHash !== payloadHash) {
+        throw new VaultIdempotencyConflictError(
+          'Idempotency key was reused with a different payload.',
+          {
+            operation,
+            key,
+          },
+        );
+      }
+
+      return existingRecord.result as TResult;
+    }
+
+    const result = await execute();
+
+    await this.idempotencyStore.set({
+      key,
+      payloadHash,
+      result,
+      expiresAt: Date.now() + this.idempotencyTtlMs,
+    });
+
+    return result;
   }
 
   private async wrapProviderCall<T>(
