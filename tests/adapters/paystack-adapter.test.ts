@@ -477,6 +477,273 @@ describe('PaystackAdapter', () => {
         }),
       ).rejects.toThrow('Paystack webhook payload is not valid JSON.');
     });
+
+    describe('event type mapping', () => {
+      it('maps Paystack "charge.success" to "payment.completed"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          event: 'charge.success',
+          data: {
+            id: 123,
+            reference: 'ref_cs',
+            created_at: '2026-03-02T00:00:00.000Z',
+          },
+        });
+        const signature = createHmac('sha512', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-paystack-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.completed');
+      });
+
+      it('maps Paystack "charge.failed" to "payment.failed"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          event: 'charge.failed',
+          data: {
+            id: 123,
+            reference: 'ref_cf',
+            created_at: '2026-03-02T00:00:00.000Z',
+          },
+        });
+        const signature = createHmac('sha512', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-paystack-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.failed');
+      });
+
+      it('maps Paystack "charge.pending" to "payment.pending"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          event: 'charge.pending',
+          data: {
+            id: 123,
+            reference: 'ref_cp',
+            created_at: '2026-03-02T00:00:00.000Z',
+          },
+        });
+        const signature = createHmac('sha512', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-paystack-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.pending');
+      });
+
+      it('maps Paystack "refund.processed" to "payment.refunded"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          event: 'refund.processed',
+          data: {
+            id: 123,
+            reference: 'ref_rp',
+            created_at: '2026-03-02T00:00:00.000Z',
+          },
+        });
+        const signature = createHmac('sha512', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-paystack-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.refunded');
+      });
+
+      it('maps Paystack "refund.success" to "payment.refunded"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          event: 'refund.success',
+          data: {
+            id: 123,
+            reference: 'ref_rs',
+            created_at: '2026-03-02T00:00:00.000Z',
+          },
+        });
+        const signature = createHmac('sha512', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-paystack-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.refunded');
+      });
+
+      it('maps Paystack "refund.pending" to "payment.partially_refunded"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          event: 'refund.pending',
+          data: {
+            id: 123,
+            reference: 'ref_rpend',
+            created_at: '2026-03-02T00:00:00.000Z',
+          },
+        });
+        const signature = createHmac('sha512', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-paystack-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.partially_refunded');
+      });
+
+      it('maps Paystack "dispute.create" to "payment.disputed"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          event: 'dispute.create',
+          data: {
+            id: 123,
+            reference: 'ref_dc',
+            created_at: '2026-03-02T00:00:00.000Z',
+          },
+        });
+        const signature = createHmac('sha512', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-paystack-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.disputed');
+      });
+
+      it('maps Paystack "dispute.resolve" to "payment.dispute_resolved"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          event: 'dispute.resolve',
+          data: {
+            id: 123,
+            reference: 'ref_dr',
+            created_at: '2026-03-02T00:00:00.000Z',
+          },
+        });
+        const signature = createHmac('sha512', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-paystack-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.dispute_resolved');
+      });
+
+      it('maps Paystack "transfer.success" to "payout.completed"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          event: 'transfer.success',
+          data: {
+            id: 123,
+            reference: 'ref_ts',
+            created_at: '2026-03-02T00:00:00.000Z',
+          },
+        });
+        const signature = createHmac('sha512', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-paystack-signature': signature,
+        });
+
+        expect(event.type).toBe('payout.completed');
+      });
+
+      it('maps Paystack "transfer.failed" to "payout.failed"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          event: 'transfer.failed',
+          data: {
+            id: 123,
+            reference: 'ref_tf',
+            created_at: '2026-03-02T00:00:00.000Z',
+          },
+        });
+        const signature = createHmac('sha512', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-paystack-signature': signature,
+        });
+
+        expect(event.type).toBe('payout.failed');
+      });
+
+      it('maps unknown Paystack event type to "payment.failed"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          event: 'some.unknown.event',
+          data: {
+            id: 123,
+            reference: 'ref_unknown',
+            created_at: '2026-03-02T00:00:00.000Z',
+          },
+        });
+        const signature = createHmac('sha512', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-paystack-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.failed');
+      });
+    });
+
+    it('accepts Buffer payload and normalizes correctly', async () => {
+      const secret = 'whsec_123';
+      const { adapter } = makeAdapter({ webhookSecret: secret });
+      const payloadStr = JSON.stringify({
+        event: 'charge.success',
+        data: {
+          id: 456,
+          reference: 'ref_buf',
+          created_at: '2026-03-02T00:00:00.000Z',
+        },
+      });
+      const signature = createHmac('sha512', secret)
+        .update(payloadStr)
+        .digest('hex');
+
+      const event = await adapter.handleWebhook(Buffer.from(payloadStr), {
+        'x-paystack-signature': signature,
+      });
+
+      expect(event.type).toBe('payment.completed');
+      expect(event.transactionId).toBe('ref_buf');
+    });
   });
 
   describe('error classification through VaultClient', () => {
@@ -536,6 +803,84 @@ describe('PaystackAdapter', () => {
           customer: { email: 'customer@example.com' },
         }),
       ).rejects.toBeInstanceOf(VaultNetworkError);
+    });
+
+    it('maps HTTP 402 card_declined to CARD_DECLINED', async () => {
+      const fetchFn = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+          createJsonResponse({ message: 'card_declined' }, 402),
+        );
+      const client = createClient(fetchFn);
+
+      await expect(
+        client.charge({
+          amount: 2500,
+          currency: 'NGN',
+          paymentMethod: { type: 'card', token: 'AUTH_123' },
+          customer: { email: 'customer@example.com' },
+        }),
+      ).rejects.toMatchObject({
+        code: 'CARD_DECLINED',
+      });
+    });
+
+    it('maps HTTP 400 fraud to FRAUD_SUSPECTED', async () => {
+      const fetchFn = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(createJsonResponse({ message: 'fraud' }, 400));
+      const client = createClient(fetchFn);
+
+      await expect(
+        client.charge({
+          amount: 2500,
+          currency: 'NGN',
+          paymentMethod: { type: 'card', token: 'AUTH_123' },
+          customer: { email: 'customer@example.com' },
+        }),
+      ).rejects.toMatchObject({
+        code: 'FRAUD_SUSPECTED',
+      });
+    });
+
+    it('maps HTTP 400 authentication_required to AUTHENTICATION_REQUIRED', async () => {
+      const fetchFn = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+          createJsonResponse({ message: 'authentication_required' }, 400),
+        );
+      const client = createClient(fetchFn);
+
+      await expect(
+        client.charge({
+          amount: 2500,
+          currency: 'NGN',
+          paymentMethod: { type: 'card', token: 'AUTH_123' },
+          customer: { email: 'customer@example.com' },
+        }),
+      ).rejects.toMatchObject({
+        code: 'AUTHENTICATION_REQUIRED',
+      });
+    });
+
+    it('maps HTTP 500 server error to PROVIDER_ERROR', async () => {
+      const fetchFn = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+          createJsonResponse({ message: 'Internal Server Error' }, 500),
+        );
+      const client = createClient(fetchFn);
+
+      await expect(
+        client.charge({
+          amount: 2500,
+          currency: 'NGN',
+          paymentMethod: { type: 'card', token: 'AUTH_123' },
+          customer: { email: 'customer@example.com' },
+        }),
+      ).rejects.toMatchObject({
+        code: 'PROVIDER_ERROR',
+      });
     });
   });
 });

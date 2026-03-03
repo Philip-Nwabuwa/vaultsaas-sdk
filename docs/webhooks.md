@@ -83,6 +83,25 @@ server.listen(3000, () => {
 });
 ```
 
+## Security Considerations
+
+### Replay protection
+
+Webhook replay protection varies by provider:
+
+- **Stripe:** Includes a `t=` timestamp in the `stripe-signature` header. The SDK enforces a 5-minute tolerance window and rejects webhooks with stale timestamps. This provides built-in replay protection.
+- **dLocal:** The `x-dlocal-signature` header contains only an HMAC signature — no timestamp is included. The SDK cannot enforce replay protection at the signature level.
+- **Paystack:** The `x-paystack-signature` header contains only an HMAC signature — no timestamp is included. The SDK cannot enforce replay protection at the signature level.
+
+### Recommended mitigations for dLocal and Paystack
+
+Since dLocal and Paystack do not include timestamps in their webhook signatures, replay protection must be handled at the application or infrastructure level:
+
+1. **IP allowlisting:** Restrict webhook endpoints to known provider IP ranges. Both dLocal and Paystack publish their webhook source IP addresses in their documentation.
+2. **WAF rules:** Use a Web Application Firewall to rate-limit and filter webhook traffic.
+3. **Idempotent handlers:** Design webhook handlers to be idempotent — processing the same event twice should produce the same result. Use the `providerEventId` field to deduplicate.
+4. **TLS termination at trusted edges:** Ensure webhooks are only accepted over HTTPS and terminate TLS at a trusted load balancer or reverse proxy.
+
 ## Normalized event shape
 
 `VaultEvent` includes:

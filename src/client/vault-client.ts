@@ -72,6 +72,13 @@ export class VaultClient {
   private readonly idempotencyTtlMs: number;
   private readonly transactionProviderIndex = new Map<string, string>();
 
+  async close(): Promise<void> {
+    if (this.platformConnector) {
+      await this.platformConnector.flush();
+      this.platformConnector.close();
+    }
+  }
+
   constructor(config: VaultConfig) {
     validateVaultConfig(config);
     this.config = config;

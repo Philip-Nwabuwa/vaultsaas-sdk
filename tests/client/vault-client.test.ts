@@ -650,6 +650,39 @@ describe('VaultClient', () => {
     expect(event.data).toEqual({ payload: 'not-json' });
   });
 
+  it('close() resolves without error when no platform connector is configured', async () => {
+    const client = createClient();
+    await expect(client.close()).resolves.toBeUndefined();
+  });
+
+  it('close() calls flush then close on platform connector', async () => {
+    const flushMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+    const client = new VaultClient({
+      providers: {
+        stripe: {
+          adapter: TestAdapter,
+          config: { providerName: 'stripe' },
+        },
+      },
+      routing: {
+        rules: [{ match: { default: true }, provider: 'stripe' }],
+      },
+      platformApiKey: 'pk_test_123',
+      platform: {
+        baseUrl: 'https://platform.test',
+      },
+    });
+
+    await expect(client.close()).resolves.toBeUndefined();
+    flushMock.mockRestore();
+  });
+
   it('preserves VaultError instances thrown by adapters', async () => {
     const client = createSingleProviderClient(VaultErrorAdapter);
 

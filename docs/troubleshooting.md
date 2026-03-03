@@ -718,6 +718,48 @@ config: {
 
 ---
 
+## 9. Capture/Refund/Void Routes to Wrong Provider in Multi-Provider Setup
+
+**Symptom:** A capture, refund, or void request is sent to the wrong provider (typically the first configured provider) instead of the provider that processed the original charge.
+
+**Cause:** The SDK tracks which provider handled each transaction in an in-memory map (`transactionProviderIndex`). On process restart (or serverless cold start), this map is empty. When the SDK cannot find the original provider for a transaction ID, it falls back to `providerOrder[0]` (the first configured/enabled provider sorted by priority).
+
+**Impact:** If you have multiple providers configured and a capture/refund/void arrives after a restart, it may be sent to a provider that has no record of the transaction, resulting in a provider error.
+
+**Workarounds:**
+
+1. **Single-provider instances in serverless:** In serverless environments (AWS Lambda, Vercel Functions, Cloudflare Workers), configure only one provider per VaultClient instance so the fallback always selects the correct provider.
+
+2. **Ensure the originating provider is first:** If you primarily use one provider, set its `priority` to the lowest number so it becomes `providerOrder[0]`:
+
+   ```ts
+   providers: {
+     stripe: {
+       adapter: StripeAdapter,
+       config: { /* ... */ },
+       priority: 1, // first in fallback order
+     },
+     dlocal: {
+       adapter: DLocalAdapter,
+       config: { /* ... */ },
+       priority: 10,
+     },
+   },
+   ```
+
+3. **Re-hydrate the index:** After a restart, call `vault.getStatus(transactionId)` before performing capture/refund/void. The `getStatus` call populates the in-memory provider index for that transaction.
+
+4. **Use `routing.provider` override:** If you know which provider handled the original transaction (e.g., from your database), pass it explicitly:
+
+   ```ts
+   await vault.capture({
+     transactionId: 'txn_123',
+     routing: { provider: 'dlocal' }, // skip provider lookup
+   });
+   ```
+
+---
+
 ## Error Code Quick Reference
 
 | Code | Category | Retriable | Common Cause |

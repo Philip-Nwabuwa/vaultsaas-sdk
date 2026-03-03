@@ -398,6 +398,218 @@ describe('DLocalAdapter', () => {
         }),
       ).rejects.toThrow('dLocal webhook payload is not valid JSON.');
     });
+
+    describe('event type mapping', () => {
+      it('maps dLocal "payment.approved" to "payment.completed"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          id: 'evt_approved',
+          type: 'payment.approved',
+          payment_id: 'pay_123',
+        });
+        const signature = createHmac('sha256', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-dlocal-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.completed');
+      });
+
+      it('maps dLocal "payment.captured" to "payment.completed"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          id: 'evt_captured',
+          type: 'payment.captured',
+          payment_id: 'pay_123',
+        });
+        const signature = createHmac('sha256', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-dlocal-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.completed');
+      });
+
+      it('maps dLocal "payment.pending" to "payment.pending"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          id: 'evt_pending',
+          type: 'payment.pending',
+          payment_id: 'pay_123',
+        });
+        const signature = createHmac('sha256', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-dlocal-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.pending');
+      });
+
+      it('maps dLocal "payment.failed" to "payment.failed"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          id: 'evt_failed',
+          type: 'payment.failed',
+          payment_id: 'pay_123',
+        });
+        const signature = createHmac('sha256', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-dlocal-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.failed');
+      });
+
+      it('maps dLocal "payment.rejected" to "payment.failed"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          id: 'evt_rejected',
+          type: 'payment.rejected',
+          payment_id: 'pay_123',
+        });
+        const signature = createHmac('sha256', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-dlocal-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.failed');
+      });
+
+      it('maps dLocal "payment.refunded" to "payment.refunded"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          id: 'evt_refunded',
+          type: 'payment.refunded',
+          payment_id: 'pay_123',
+        });
+        const signature = createHmac('sha256', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-dlocal-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.refunded');
+      });
+
+      it('maps dLocal "payment.partially_refunded" to "payment.partially_refunded"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          id: 'evt_partial_refund',
+          type: 'payment.partially_refunded',
+          payment_id: 'pay_123',
+        });
+        const signature = createHmac('sha256', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-dlocal-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.partially_refunded');
+      });
+
+      it('maps dLocal "chargeback.created" to "payment.disputed"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          id: 'evt_chargeback',
+          type: 'chargeback.created',
+          payment_id: 'pay_123',
+        });
+        const signature = createHmac('sha256', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-dlocal-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.disputed');
+      });
+
+      it('maps dLocal "chargeback.closed" to "payment.dispute_resolved"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          id: 'evt_chargeback_closed',
+          type: 'chargeback.closed',
+          payment_id: 'pay_123',
+        });
+        const signature = createHmac('sha256', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-dlocal-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.dispute_resolved');
+      });
+
+      it('maps unknown dLocal event type to "payment.failed"', async () => {
+        const secret = 'whsec_123';
+        const { adapter } = makeAdapter({ webhookSecret: secret });
+        const payload = JSON.stringify({
+          id: 'evt_unknown',
+          type: 'some.unknown.event',
+          payment_id: 'pay_123',
+        });
+        const signature = createHmac('sha256', secret)
+          .update(payload)
+          .digest('hex');
+
+        const event = await adapter.handleWebhook(payload, {
+          'x-dlocal-signature': signature,
+        });
+
+        expect(event.type).toBe('payment.failed');
+      });
+    });
+
+    it('accepts Buffer payload and normalizes correctly', async () => {
+      const secret = 'whsec_123';
+      const { adapter } = makeAdapter({ webhookSecret: secret });
+      const payloadStr = JSON.stringify({
+        id: 'evt_buf',
+        type: 'payment.approved',
+        payment_id: 'pay_buf',
+      });
+      const signature = createHmac('sha256', secret)
+        .update(payloadStr)
+        .digest('hex');
+
+      const event = await adapter.handleWebhook(Buffer.from(payloadStr), {
+        'x-dlocal-signature': signature,
+      });
+
+      expect(event.type).toBe('payment.completed');
+      expect(event.transactionId).toBe('pay_buf');
+    });
   });
 
   describe('error classification through VaultClient', () => {
@@ -454,6 +666,80 @@ describe('DLocalAdapter', () => {
           paymentMethod: { type: 'pix' },
         }),
       ).rejects.toBeInstanceOf(VaultNetworkError);
+    });
+
+    it('maps HTTP 402 card_declined to CARD_DECLINED', async () => {
+      const fetchFn = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+          createJsonResponse({ message: 'card_declined' }, 402),
+        );
+      const client = createClient(fetchFn);
+
+      await expect(
+        client.charge({
+          amount: 1500,
+          currency: 'BRL',
+          paymentMethod: { type: 'pix' },
+        }),
+      ).rejects.toMatchObject({
+        code: 'CARD_DECLINED',
+      });
+    });
+
+    it('maps HTTP 400 with fraud message to FRAUD_SUSPECTED', async () => {
+      const fetchFn = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(createJsonResponse({ message: 'fraud' }, 400));
+      const client = createClient(fetchFn);
+
+      await expect(
+        client.charge({
+          amount: 1500,
+          currency: 'BRL',
+          paymentMethod: { type: 'pix' },
+        }),
+      ).rejects.toMatchObject({
+        code: 'FRAUD_SUSPECTED',
+      });
+    });
+
+    it('maps HTTP 400 with authentication_required message to AUTHENTICATION_REQUIRED', async () => {
+      const fetchFn = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+          createJsonResponse({ message: 'authentication_required' }, 400),
+        );
+      const client = createClient(fetchFn);
+
+      await expect(
+        client.charge({
+          amount: 1500,
+          currency: 'BRL',
+          paymentMethod: { type: 'pix' },
+        }),
+      ).rejects.toMatchObject({
+        code: 'AUTHENTICATION_REQUIRED',
+      });
+    });
+
+    it('maps HTTP 500 server error to PROVIDER_ERROR', async () => {
+      const fetchFn = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+          createJsonResponse({ message: 'Internal Server Error' }, 500),
+        );
+      const client = createClient(fetchFn);
+
+      await expect(
+        client.charge({
+          amount: 1500,
+          currency: 'BRL',
+          paymentMethod: { type: 'pix' },
+        }),
+      ).rejects.toMatchObject({
+        code: 'PROVIDER_ERROR',
+      });
     });
   });
 });
